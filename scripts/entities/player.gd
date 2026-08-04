@@ -13,14 +13,6 @@ func _ready() -> void:
 	if grid_manager:
 		grid_pos = grid_manager.world_to_grid(position)
 		target_pos = position
-		print("✅ GridManager encontrado, posición inicial: ", grid_pos)
-	else:
-		print("❌ GridManager NO encontrado")
-	
-	var anim_sprite = get_node("AnimatedSprite2D")
-	if anim_sprite:
-		anim_sprite.stop()
-		anim_sprite.set_frame(0)
 
 func _physics_process(delta: float) -> void:
 	if not is_moving:
@@ -42,7 +34,6 @@ func _handle_movement_input() -> void:
 			_update_animation(false)
 		return
 	
-	# Redondear a 4 direcciones
 	var dir: Vector2i = Vector2i.ZERO
 	if abs(input_dir.x) > abs(input_dir.y):
 		dir.x = sign(input_dir.x)
@@ -51,13 +42,11 @@ func _handle_movement_input() -> void:
 	
 	var new_grid_pos: Vector2i = grid_pos + dir
 	
-	# Siempre permitir movimiento (is_walkable siempre true)
-	if grid_manager:
+	if grid_manager and grid_manager.is_walkable(new_grid_pos.x, new_grid_pos.y):
 		grid_pos = new_grid_pos
 		target_pos = grid_manager.grid_to_world(grid_pos.x, grid_pos.y)
 		is_moving = true
 		_update_animation(true, dir)
-		print("✅ Moviendo a: ", target_pos)
 
 func _update_animation(moving: bool, dir: Vector2i = Vector2i.ZERO) -> void:
 	var anim_sprite = get_node("AnimatedSprite2D")
