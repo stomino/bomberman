@@ -11,7 +11,11 @@ var bomb_system: BombSystem
 var powerup_system: PowerUpSystem
 var game_manager: GameManager
 
-const LOCAL_PLAYER_ID := 0
+## Var, no const: ClientRoot (Fase 4, ver
+## docs/architecture/Implementation_Decisions.md) hereda de GameRoot y la
+## sobreescribe con el peer id que el servidor le asigna al conectar, para
+## poder reutilizar sin cambios todos los getters de más abajo.
+var LOCAL_PLAYER_ID := 0
 
 var _map_is_custom: bool = false
 
@@ -101,21 +105,15 @@ func _inject_into_game_renderer() -> void:
 # ============================================
 
 func set_player_move_direction(direction: Vector2i) -> void:
-	player_system.set_move_direction(LOCAL_PLAYER_ID, direction)
+	game_manager.queue_command(MoveCommand.new(LOCAL_PLAYER_ID, direction))
 
 
 func clear_player_input() -> void:
-	player_system.clear_input(LOCAL_PLAYER_ID)
+	game_manager.queue_command(MoveCommand.new(LOCAL_PLAYER_ID, Vector2i.ZERO))
 
 
-func try_place_bomb() -> bool:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
-	if player == null or not player.alive:
-		return false
-
-	var bomb_range := player_system.get_effective_bomb_range(player)
-	var max_bombs := player_system.get_effective_max_bombs(player)
-	return bomb_system.place_bomb(player.grid_position, LOCAL_PLAYER_ID, bomb_range, max_bombs)
+func try_place_bomb() -> void:
+	game_manager.queue_command(PlaceBombCommand.new(LOCAL_PLAYER_ID))
 
 
 func is_player_alive() -> bool:

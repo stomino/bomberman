@@ -104,16 +104,6 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 	player.has_pending_move = true
 
 
-func clear_input(player_id: int) -> void:
-	var player := get_player(player_id)
-
-	if player == null:
-		return
-
-	player.next_direction = Vector2i.ZERO
-	player.has_pending_move = false
-
-
 func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	var player := get_player(player_id)
 

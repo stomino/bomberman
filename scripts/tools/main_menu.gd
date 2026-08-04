@@ -5,6 +5,7 @@ extends Node2D
 ## árbol — no amerita un autoload solo para este dato puntual.
 
 var _maps_option: OptionButton
+var _ip_input: LineEdit
 
 
 func _ready() -> void:
@@ -51,6 +52,28 @@ func _build_ui() -> void:
 	editor_button.pressed.connect(_on_editor_pressed)
 	vbox.add_child(editor_button)
 
+	var server_button := Button.new()
+	server_button.text = "Servidor (Fase 4: red local)"
+	server_button.pressed.connect(_on_server_pressed)
+	vbox.add_child(server_button)
+
+	var client_row := HBoxContainer.new()
+	vbox.add_child(client_row)
+
+	var client_label := Label.new()
+	client_label.text = "Cliente, IP:"
+	client_row.add_child(client_label)
+
+	_ip_input = LineEdit.new()
+	_ip_input.text = "127.0.0.1"
+	_ip_input.custom_minimum_size = Vector2(140, 0)
+	client_row.add_child(_ip_input)
+
+	var client_button := Button.new()
+	client_button.text = "Conectar"
+	client_button.pressed.connect(_on_client_pressed)
+	client_row.add_child(client_button)
+
 
 func _on_sandbox_pressed() -> void:
 	if _maps_option.selected > 0:
@@ -64,3 +87,19 @@ func _on_sandbox_pressed() -> void:
 
 func _on_editor_pressed() -> void:
 	get_tree().change_scene_to_file("res://scenes/map_editor.tscn")
+
+
+func _on_server_pressed() -> void:
+	if _maps_option.selected > 0:
+		var file_name := _maps_option.get_item_text(_maps_option.selected)
+		get_tree().root.set_meta("selected_map_path", MapDefinition.MAPS_DIR + file_name)
+	else:
+		get_tree().root.set_meta("selected_map_path", "")
+
+	get_tree().change_scene_to_file("res://scenes/server.tscn")
+
+
+func _on_client_pressed() -> void:
+	var ip := _ip_input.text.strip_edges()
+	get_tree().root.set_meta("server_ip", ip if ip != "" else "127.0.0.1")
+	get_tree().change_scene_to_file("res://scenes/client.tscn")

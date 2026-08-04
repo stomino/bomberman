@@ -251,6 +251,149 @@ rendering, o al migrar de motor — ese es el momento de extraer
 `TickLoop` como una clase propia que `GameRoot` (o su equivalente en el
 otro motor) alimente con delta.
 
+## Fase 4: Commands como pipeline único de input (local y en red)
+
+**Decisión:** `MoveCommand`/`PlaceBombCommand`
+(`scripts/engine/core/commands/`) son objetos `RefCounted` inmutables que
+representan intent, tal como pide el spec ("Input → Commands →
+GameManager", Golden Rule 6) — hueco que existía desde el principio:
+`GameRoot` llamaba directo a `player_system`/`bomb_system`. `GameManager`
+gana `queue_command()` + una cola interna que se drena al inicio de cada
+`tick()` (`_apply_pending_commands()`), antes del resto de la lógica de
+tick. La regla de "bomba efectiva" (calcular `bomb_range`/`max_bombs` vía
+`PlayerSystem.get_effective_*` y llamar `BombSystem.place_bomb`), que
+antes vivía en `GameRoot.try_place_bomb()`, se movió adentro de
+`GameManager._apply_place_bomb()` — un solo dueño de esa regla, en Core.
+
+`GameRoot` (sandbox local, sin red) también pasó a encolar Commands en
+vez de mutar `player_system` directo. Efecto observable: el input tarda
+un tick más en aplicarse (antes era inmediato); a 60 ticks/seg es
+imperceptible.
+
+**Por qué:** los Commands son la unidad natural que viaja del Cliente al
+Servidor por RPC (ver más abajo). Se decidió que el modo sandbox local
+pasara por el mismo pipeline — no un camino aparte "solo para red" — para
+que un solo código (`GameManager._apply_pending_commands`) sea la única
+fuente de verdad de cómo se aplica el input, y que el sandbox local siga
+siendo un test fiel de cómo se va a comportar el juego en red.
+
+`clear_input()` de `PlayerSystem` se eliminó (dead code): pasar
+`Vector2i.ZERO` a `set_move_direction` ya hacía exactamente lo mismo, así
+que no hace falta un `ClearInputCommand` separado — `GameRoot.clear_player_input()`
+y `ClientRoot.clear_player_input()` encolan/mandan un `MoveCommand` con
+`Vector2i.ZERO`.
+
+## Fase 4: ServerRoot y ClientRoot — cliente-servidor real (ENet) en una sola PC
+
+**Decisión:** Se implementó con red real desde el día 1, no un transporte
+simulado: `ServerRoot` (`scripts/engine/infrastructure/network/server_root.gd`)
+crea un `ENetMultiplayerPeer.create_server()`; `ClientRoot`
+(`client_root.gd`) crea `ENetMultiplayerPeer.create_client()`. Ambos
+corren como procesos separados de Godot en la misma PC, conectados por
+`127.0.0.1`. Nuevas escenas `scenes/server.tscn` / `scenes/client.tscn`,
+accesibles desde botones nuevos en el menú principal ("Servidor" y
+"Cliente" con IP).
+
+`ClientRoot extends GameRoot`: reutiliza sin cambios toda la superficie
+de lectura que ya usan `player_node.gd`/`game_renderer.gd`
+(`is_player_alive`, `get_player_render_position`, etc.) — esos métodos ya
+solo leían `player_system`/`bomb_system`/`powerup_system`/`game_map`, así
+que alcanza con poblar esos mismos contenedores desde snapshots en vez de
+simularlos. Solo sobreescribe `_ready()` (arma contenedores vacíos +
+conecta como cliente en vez de simular), `_physics_process()` (no llama
+`game_manager.tick()` — el cliente nunca es autoritativo), y los 3
+métodos de input (mandan RPC al servidor en vez de encolar localmente).
+Para esto, `GameRoot.LOCAL_PLAYER_ID` pasó de `const` a `var`:
+`ClientRoot` la sobreescribe con `multiplayer.get_unique_id()` (el peer
+id que Godot asigna al conectar) al conectarse, en vez de `0` fijo.
+
+`ServerRoot` no hereda de `GameRoot` (arma simulación para N jugadores
+remotos, no 1 local; no tiene Presentation que inyectar) — duplica la
+composición de `balance`/`game_map`/systems/`game_manager` (~6 líneas, no
+amerita una fábrica compartida). Jugadores se crean/borran en
+`peer_connected`/`peer_disconnected`, con `Player.id = peer_id` (los
+peer ids de Godot son globalmente únicos; el servidor siempre es `1`).
+
+**Ajuste real respecto al plan original — NodePath de RPC:** Godot solo
+rutea un RPC entre dos peers si el nodo que lo declara existe en el
+**mismo NodePath** en ambos árboles de escena (confirmado contra la
+documentación oficial). El plan inicial asumía que `ClientRoot` podía
+seguir siendo hermano de `Player`/`GameRenderer` como hoy es `GameRoot`
+en `main.tscn` — eso pone a `ClientRoot` en `/root/Match/ClientRoot`, que
+NO coincide con `/root/Match` (el path de `ServerRoot`, que sí es la raíz
+de `server.tscn`). Se corrigió durante la implementación: en
+`client.tscn`, `ClientRoot` es la **raíz** de la escena (nodo "Match",
+igual que en `server.tscn`), y `Player`/`GameRenderer` pasaron a ser sus
+hijos directos. Esto obligó a sobreescribir
+`_inject_into_player_node()`/`_inject_into_game_renderer()` en
+`ClientRoot` (paths `"Player"`/`"GameRenderer"` en vez de
+`"../Player"`/`"../GameRenderer"`) — la única parte de la superficie de
+`GameRoot` que si necesitó cambiar, justamente porque depende de la
+posición del nodo en el árbol, no del estado del juego.
+
+También como consecuencia: la raíz de `client.tscn` es `type="Node2D"`
+(no `"Node"`) con `scale = Vector2(2, 2)` puesto ahí directamente (antes
+esa escala vivía en el nodo "Main", separado del `GameRoot`) — un script
+`extends Node` puede attachearse a un nodo `Node2D` sin problema (Node2D
+es-un Node), así que `ClientRoot`/`GameRoot` siguen siendo válidos ahí.
+
+Cada script declara sus propios métodos `@rpc` en vez de heredarlos de
+una clase base compartida (`ServerRoot.submit_move`/`submit_place_bomb`
+con lógica real + stub vacío de `receive_snapshot`; `ClientRoot` al
+revés) — GDScript tuvo bugs históricos con anotaciones `@rpc` no
+heredadas correctamente en subclases, así que se prefirió texto repetido
+pero explícito.
+
+**Por qué red real y no un transporte simulado:** para que Fase 5 (LAN) y
+Fase 6 (Internet) sean "cambiar la IP" sobre el mismo protocolo, no
+reescribir el transporte — evita exactamente la clase de solución
+temporal que el documento de producto pide evitar.
+
+## Fase 4: SnapshotCodec — snapshot completo por tick, sin DTOs nuevos
+
+**Decisión:** `scripts/engine/infrastructure/network/snapshot_codec.gd`
+(`SnapshotCodec`, funciones estáticas `serialize`/`apply`) traduce
+`GameState`/`PlayerSystem`/`BombSystem`/`PowerUpSystem`/`GameMap` a un
+`Dictionary` y de vuelta. `apply()` reconstruye/actualiza in-place las
+mismas clases Domain que ya existen (`Player`, `Bomb`, `Explosion`,
+`PowerUp`, `GameMap.grid`) — no se inventaron DTOs de red separados. El
+cliente nunca llama `.tick()` sobre estos objetos: son un espejo de solo
+lectura.
+
+El servidor manda el mapa completo (`grid`, ancho, alto, `cell_size`) en
+cada snapshot, no solo una vez al conectar — así el cliente no necesita
+adivinar qué mapa eligió el servidor (default o uno del editor); lo
+aprende del snapshot, igual que el resto del estado.
+
+`ClientRoot` sí carga su propio `GameBalance.load_from_file()`
+localmente (mismo archivo que usa el servidor) — pero solo se usa para
+constantes cosméticas de Presentation (ej. el degradé de la mecha de la
+bomba en `game_renderer.gd`), nunca para decidir nada de gameplay; todo
+lo que afecta el resultado del juego llega exclusivamente por snapshot.
+
+**Hallazgo real probando en vivo (servidor + cliente reales sobre
+loopback, no solo tests unitarios):** el snapshot completo (mapa 13x11 +
+entidades) supera fácil el MTU de ENet (~1392 bytes; se vieron paquetes
+de ~1900 bytes) — mandarlo por el canal `"unreliable"` que tenía
+`receive_snapshot` en el plan original tira el warning de ENet "above
+the MTU... higher packet loss". Se cambió `receive_snapshot` a
+`"reliable"` (ENet sí fragmenta paquetes reliable en varios paquetes
+chicos automáticamente) en ambos lados (`ServerRoot`/`ClientRoot`, tienen
+que matchear). Con esto, una prueba real end-to-end (mover al jugador,
+colocar bomba, esperar la explosión y el respawn) se vio reflejada
+correctamente en el cliente en cada paso, sin errores ni warnings.
+
+**Qué quedó explícitamente fuera de esta primera pasada** (Fase 4 se
+acotó a 1 jugador vía red, decisión tomada con el dueño del producto
+antes de implementar): 2+ jugadores conectados simultáneamente
+(`ServerRoot` ya soporta N del lado servidor — mismo `PlayerSystem.players`
+como diccionario de siempre — pero `ClientRoot` en esta pasada solo
+renderiza al jugador local, no rivales), predicción de cliente /
+reconciliación (`GameBalance.prediction_enabled`/`reconciliation_enabled`
+siguen en `false` — no hacen falta con latencia ~0 en loopback),
+delta-compression / snapshot rate configurable (optimización, Fase 10),
+reconexión, espectador, y servidor dedicado headless empaquetado (Fase 6).
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`
