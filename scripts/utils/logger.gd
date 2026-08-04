@@ -4,7 +4,7 @@
 # LOGGER SIMPLE - SOLO FUNCIONA EN MODO DEBUG
 # ============================================
 
-class_name Logger
+class_name GameLogger
 extends RefCounted
 
 # ============================================
