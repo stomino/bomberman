@@ -128,6 +128,23 @@ func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	player.has_pending_move = false
 
 
+func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
+	"""A diferencia de _respawn (muerte dentro de una ronda), esto también
+	limpia los powerups acumulados: cada ronda arranca pareja."""
+	var player := get_player(player_id)
+
+	if player == null:
+		return
+
+	reset_to_position(player_id, spawn_position)
+	player.alive = true
+	player.respawn_at_tick = -1
+	player.speed_powerup_stacks = 0
+	player.bomb_range_powerup_stacks = 0
+	player.extra_bomb_powerup_stacks = 0
+	player.shield_ticks_remaining = 0
+
+
 func get_effective_speed(player: Player) -> float:
 	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack
 	return balance.get_speed_for_character() * (1.0 + bonus)

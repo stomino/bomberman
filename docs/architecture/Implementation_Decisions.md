@@ -7,6 +7,43 @@ explica cómo se aterrizaron y por qué, para que se puedan revisar o
 revertir con contexto si el juego evoluciona (por ejemplo, si se migra de
 motor).
 
+## Sistema de rondas: reglas simples, decididas por el dueño del producto
+
+**Decisión:** ronda termina cuando queda un solo jugador vivo (gana, suma
+`Player.rounds_won`) o cero (empate técnico, nadie suma). Al terminar una
+ronda: `GameMap.regenerate()` + `BombSystem.reset_round()` +
+`PowerUpSystem.clear_all()` + `PlayerSystem.reset_for_new_round()` para
+cada jugador (esto último también resetea los powerups acumulados —
+cada ronda arranca pareja). La partida termina cuando
+`state.tick >= balance.match_duration_seconds * balance.tick_rate`; gana
+quien tenga más rondas ganadas, empate si están iguales
+(`GameState.winner_id = -1`).
+
+Toda esta lógica vive en `GameManager` (no es un system nuevo): no posee
+entidades propias, solo coordina el ciclo de vida de una ronda entre
+systems que ya existen — encaja con su rol ya establecido de coordinador
+(mismo patrón que `apply_explosion_damage`/`_resolve_powerup_pickups`).
+
+**Guardia importante:** con menos de 2 jugadores registrados,
+`_check_round_end`/`_check_match_end` no hacen nada. El modo actual
+(sandbox de un jugador, sobrevivir y respawnear indefinidamente) sigue
+funcionando sin cambios — las reglas de ronda/partida recién se activan
+cuando hay más de un jugador real, que todavía no existe en este proyecto
+(llega en Fase 4/5). Se decidió así explícitamente para no romper el único
+modo jugable que existe hoy.
+
+`GameManager.tick()` ahora no hace nada hasta que se llama
+`start_match()` explícitamente (antes tickeaba desde el primer frame).
+`GameRoot._ready()` lo llama una vez, al final de su setup — hace el
+arranque de partida explícito en vez de implícito en el primer tick.
+
+Se renombró `GameBalance.round_time_seconds` (nunca usado desde que
+existía) a `match_duration_seconds`, porque el nombre y el valor por
+defecto (120s) no correspondían a ningún concepto implementado; el
+nuevo nombre sí. `overtime_seconds` queda sin usar por ahora — podría
+servir el día que se quiera desempatar la partida en vez de declarar
+empate, pero eso no se pidió todavía.
+
 ## Balance base vs. balance de powerups: dos lugares separados a propósito
 
 **Decisión:** `GameBalance` sigue siendo la única fuente de la base del

@@ -20,12 +20,13 @@ func _ready() -> void:
 	bomb_system = BombSystem.new(game_map, balance)
 	player_system = PlayerSystem.new(game_map, balance, bomb_system)
 	powerup_system = PowerUpSystem.new(balance)
-	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system)
+	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system, balance)
 
 	_spawn_local_player()
 	_connect_bomb_signals()
 	_inject_into_player_node()
 	_inject_into_game_renderer()
+	game_manager.start_match()
 
 
 func _physics_process(_delta: float) -> void:

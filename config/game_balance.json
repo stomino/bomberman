@@ -62,7 +62,7 @@
     },
     "game": {
         "tick_rate": 60,
-        "round_time_seconds": 120,
+        "match_duration_seconds": 300,
         "overtime_seconds": 30
     },
     "server": {

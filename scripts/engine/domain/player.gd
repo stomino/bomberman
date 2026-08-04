@@ -6,6 +6,7 @@ var grid_position: Vector2i
 
 var alive: bool = true
 var respawn_at_tick: int = -1
+var rounds_won: int = 0
 
 # Cuántos powerups de cada tipo acumuló. Nunca se guarda un valor final
 # (velocidad, rango, etc.) — siempre se deriva de balance base + estos

@@ -56,7 +56,7 @@ var max_players: int = 4
 var respawn_ticks: int = 120
 
 var tick_rate: int = 60
-var round_time_seconds: int = 120
+var match_duration_seconds: int = 300
 var overtime_seconds: int = 30
 
 var authoritative: bool = true
@@ -178,7 +178,7 @@ func _apply_config(data: Dictionary) -> void:
 	if data.has("game"):
 		var g = data["game"]
 		if g.has("tick_rate"): tick_rate = g["tick_rate"]
-		if g.has("round_time_seconds"): round_time_seconds = g["round_time_seconds"]
+		if g.has("match_duration_seconds"): match_duration_seconds = g["match_duration_seconds"]
 		if g.has("overtime_seconds"): overtime_seconds = g["overtime_seconds"]
 
 	if data.has("server"):
@@ -286,7 +286,7 @@ func save_to(path: String = "res://config/game_balance_exported.json") -> bool:
 		},
 		"game": {
 			"tick_rate": tick_rate,
-			"round_time_seconds": round_time_seconds,
+			"match_duration_seconds": match_duration_seconds,
 			"overtime_seconds": overtime_seconds
 		},
 		"server": {

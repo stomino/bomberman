@@ -21,6 +21,17 @@ func _init(map: GameMap, game_balance: GameBalance) -> void:
 	_initialize_destructible_blocks()
 
 
+func reset_round() -> void:
+	"""Limpia bombas/explosiones/bloques y vuelve a poblar el patrón de
+	destructibles. Asume que game_map.regenerate() ya se llamó antes (si
+	no, _initialize_destructible_blocks pisaría celdas que todavía tienen
+	bloques rotos de la ronda anterior)."""
+	bombs.clear()
+	explosions.clear()
+	destructible_blocks.clear()
+	_initialize_destructible_blocks()
+
+
 func _initialize_destructible_blocks() -> void:
 	if not balance.destructible_pattern_enabled:
 		return

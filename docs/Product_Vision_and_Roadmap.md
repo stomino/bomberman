@@ -136,6 +136,37 @@ No forma parte de la primera etapa. Orden correcto: Gameplay → Multiplayer
 Etapa avanzada: Steamworks, Steam Cloud, Friends, Invitaciones, Overlay,
 Logros. No debe desarrollarse durante las primeras fases.
 
+## Editor de mapas (Fase 3.5)
+
+**Por qué existe esta fase:** todavía no se sabe qué prefieren los
+jugadores en cuanto a mapas — pasillos vs. huecos, grandes vs. chicos,
+estáticos (memorizables) vs. procedurales (patrones reconocibles pero
+ubicación impredecible). En vez de adivinar, el plan es ofrecer variedad
+desde el arranque y aprender del feedback real de los jugadores. Para eso
+hace falta poder crear mapas rápido, a mano — sin ella, cada mapa nuevo
+significa tocar código.
+
+**Qué es:** un editor de mapas simple, al estilo del World Editor de
+Warcraft 3 — un espacio en blanco donde pintar celdas (piso, pared
+indestructible, bloque destructible, spawn) y guardar el resultado. Es
+factible de forma directa en este proyecto porque `GameMap` ya es una
+estructura de datos pura, completamente separada del render — el editor
+es, en esencia, otra pieza de Presentation que lee/escribe esa misma
+estructura, sin tocar Domain/Systems.
+
+**Doble propósito:** la misma herramienta sirve primero para el propio
+desarrollo (probar teorías de diseño de mapa antes de tener jugadores) y
+después, sin cambios de arquitectura, para la comunidad — si no se
+encuentra la respuesta a qué mapa funciona mejor, que la generen los
+propios jugadores. Compartir esos mapas con otros (workshop) depende de
+tener Steam integrado, así que esa parte llega naturalmente en la Fase 9;
+el editor y los mapas locales no dependen de eso para nada.
+
+**Cuándo:** después de cerrar Fase 3 (con el sistema de rondas
+funcionando) y antes de Fase 4 (cliente-servidor) — es una herramienta de
+iteración de gameplay, prioridad #1 según la filosofía del proyecto, y
+conviene tenerla antes de meterse en la complejidad de red.
+
 ## Principio fundamental
 
 El proyecto debe construirse como un juego competitivo online desde el
@@ -149,7 +180,8 @@ desde el inicio.
 |---|---|---|
 | 1 | Movimiento, colisiones, grilla | ✅ Hecho |
 | 2 | Bombas, explosiones, bloques destructibles | ✅ Hecho |
-| 3 | PowerUps, reglas completas, sistema de rondas | 🔜 En curso |
+| 3 | PowerUps, reglas completas, sistema de rondas | 🔶 PowerUps hechos; sistema de rondas en curso |
+| 3.5 | Editor de mapas | Pendiente |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | Pendiente |
 | 5 | Multiplayer LAN | Pendiente |
 | 6 | Servidor dedicado, juego por Internet | Pendiente |

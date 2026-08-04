@@ -34,6 +34,13 @@ func _build_grid(indestructible_border: bool) -> void:
 		grid.append(row)
 
 
+func regenerate() -> void:
+	"""Vuelve la grilla a su estado original (borde + vacío), sin bloques
+	destructibles. Usado al empezar una ronda nueva; quien vuelve a poner
+	el patrón de bloques es BombSystem.reset_round()."""
+	_build_grid(_balance.indestructible_border)
+
+
 func is_within_bounds(grid_x: int, grid_y: int) -> bool:
 	return grid_x >= 0 and grid_x < width and grid_y >= 0 and grid_y < height
 

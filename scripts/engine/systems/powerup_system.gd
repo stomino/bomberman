@@ -31,6 +31,10 @@ func maybe_spawn_from_destroyed_block(pos: Vector2i) -> void:
 	GameLogger.debug("PowerUp %s apareció en %s" % [PowerUp.type_to_string(type), str(pos)], "PowerUpSystem")
 
 
+func clear_all() -> void:
+	powerups.clear()
+
+
 func get_powerup_at(pos: Vector2i) -> PowerUp:
 	for p in powerups:
 		if p.grid_pos == pos:
