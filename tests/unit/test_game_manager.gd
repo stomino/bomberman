@@ -34,15 +34,15 @@ func test_full_tick_pipeline_kills_and_respawns_player() -> void:
 	var map := GameMap.new(balance)
 	var bombs := BombSystem.new(map, balance)
 	var players := PlayerSystem.new(map, balance, bombs)
-	var manager := GameManager.new(map, players, bombs)
+	var powerups := PowerUpSystem.new(balance)
+	var manager := GameManager.new(map, players, bombs, powerups)
 
 	var player := Player.new()
 	player.id = 0
 	player.grid_position = Vector2i(3, 3)
-	player.speed = balance.get_speed_for_character()
 	players.add_player(player)
 
-	bombs.place_bomb(Vector2i(3, 3), 0)
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	for i in range(3):
 		manager.tick()
@@ -54,3 +54,33 @@ func test_full_tick_pipeline_kills_and_respawns_player() -> void:
 
 	assert_true(player.alive, "debería haber respawneado tras respawn_ticks")
 	assert_eq(manager.state.tick, 3 + balance.respawn_ticks)
+
+
+func test_player_picks_up_powerup_via_full_tick_pipeline() -> void:
+	var balance := _make_balance()
+	balance.destructible_drop_chance = 1.0
+	balance.powerup_distribution = {"bomb_range": 1.0}  # determinístico: siempre bomb_range
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var players := PlayerSystem.new(map, balance, bombs)
+	var powerups := PowerUpSystem.new(balance)
+	var manager := GameManager.new(map, players, bombs, powerups)
+
+	var player := Player.new()
+	player.id = 0
+	player.grid_position = Vector2i(3, 3)
+	players.add_player(player)
+
+	var base_range := players.get_effective_bomb_range(player)
+
+	powerups.maybe_spawn_from_destroyed_block(Vector2i(3, 3))  # simula un powerup ya en la celda del jugador
+	assert_eq(powerups.powerups.size(), 1)
+
+	manager.tick()
+
+	assert_eq(powerups.powerups.size(), 0, "el powerup debería haberse recolectado en el tick")
+	assert_eq(
+		players.get_effective_bomb_range(player),
+		base_range + balance.powerups.bomb_range_bonus_per_stack,
+		"el efecto del powerup debería haberse aplicado al jugador"
+	)

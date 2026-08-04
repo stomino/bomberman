@@ -29,7 +29,7 @@ func test_place_bomb_succeeds_on_walkable_cell() -> void:
 	var map := GameMap.new(balance)
 	var bombs := BombSystem.new(map, balance)
 
-	var placed := bombs.place_bomb(Vector2i(3, 3), 0)
+	var placed := bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	assert_true(placed)
 	assert_eq(bombs.get_active_bombs_count(), 1)
@@ -40,8 +40,8 @@ func test_cannot_place_two_bombs_same_cell() -> void:
 	var map := GameMap.new(balance)
 	var bombs := BombSystem.new(map, balance)
 
-	bombs.place_bomb(Vector2i(3, 3), 0)
-	var placed_again := bombs.place_bomb(Vector2i(3, 3), 0)
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
+	var placed_again := bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	assert_false(placed_again)
 	assert_eq(bombs.get_active_bombs_count(), 1)
@@ -52,10 +52,21 @@ func test_respects_max_bombs_per_player() -> void:
 	var map := GameMap.new(balance)
 	var bombs := BombSystem.new(map, balance)
 
-	bombs.place_bomb(Vector2i(2, 2), 0)
-	var second := bombs.place_bomb(Vector2i(3, 3), 0)
+	bombs.place_bomb(Vector2i(2, 2), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
+	var second := bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	assert_false(second, "con max_bombs_per_player = 1 no debería poder colocar una segunda")
+
+
+func test_max_bombs_is_per_call_not_global() -> void:
+	var balance := _make_balance()
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+
+	bombs.place_bomb(Vector2i(2, 2), 0, balance.get_bomb_range(), 2)  # a este jugador le pasan max_bombs=2
+	var second := bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), 2)
+
+	assert_true(second, "el caller decide max_bombs por jugador, no BombSystem")
 
 
 func test_cannot_place_on_indestructible_cell() -> void:
@@ -63,7 +74,7 @@ func test_cannot_place_on_indestructible_cell() -> void:
 	var map := GameMap.new(balance)
 	var bombs := BombSystem.new(map, balance)
 
-	var placed := bombs.place_bomb(Vector2i(0, 0), 0)
+	var placed := bombs.place_bomb(Vector2i(0, 0), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	assert_false(placed)
 
@@ -77,7 +88,7 @@ func test_explosion_destroys_destructible_block_and_stops() -> void:
 	var bombs := BombSystem.new(map, balance)
 	var state := GameState.new()
 
-	bombs.place_bomb(Vector2i(3, 3), 0)  # range 3, timer 3
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)  # range 3, timer 3
 
 	for i in range(3):
 		bombs.tick(state)
@@ -93,7 +104,7 @@ func test_explosion_stops_at_indestructible_border() -> void:
 	var bombs := BombSystem.new(map, balance)
 	var state := GameState.new()
 
-	bombs.place_bomb(Vector2i(1, 3), 0)  # pegado al borde izquierdo
+	bombs.place_bomb(Vector2i(1, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)  # pegado al borde izquierdo
 
 	for i in range(3):
 		bombs.tick(state)
@@ -108,12 +119,12 @@ func test_chain_explosion_detonates_nearby_bomb_before_its_natural_timer() -> vo
 	var bombs := BombSystem.new(map, balance)
 	var state := GameState.new()
 
-	bombs.place_bomb(Vector2i(3, 3), 0)  # range 2, timer 5
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)  # range 2, timer 5
 
 	for i in range(4):
 		bombs.tick(state)  # bomb1: 5 -> 1, todavía no explota
 
-	bombs.place_bomb(Vector2i(5, 3), 1)  # dentro del rango de bomb1, timer fresco = 5
+	bombs.place_bomb(Vector2i(5, 3), 1, balance.get_bomb_range(), balance.max_bombs_per_player)  # dentro del rango de bomb1, timer fresco = 5
 
 	bombs.tick(state)  # tick 5: bomb1 explota y debería forzar timer=0 en bomb2
 	assert_eq(bombs.get_active_bombs_count(), 1, "bomb1 debería haber explotado; bomb2 sigue activa con timer forzado a 0")

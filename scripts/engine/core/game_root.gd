@@ -8,6 +8,7 @@ var balance: GameBalance
 var game_map: GameMap
 var player_system: PlayerSystem
 var bomb_system: BombSystem
+var powerup_system: PowerUpSystem
 var game_manager: GameManager
 
 const LOCAL_PLAYER_ID := 0
@@ -18,7 +19,8 @@ func _ready() -> void:
 	game_map = GameMap.new(balance)
 	bomb_system = BombSystem.new(game_map, balance)
 	player_system = PlayerSystem.new(game_map, balance, bomb_system)
-	game_manager = GameManager.new(game_map, player_system, bomb_system)
+	powerup_system = PowerUpSystem.new(balance)
+	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system)
 
 	_spawn_local_player()
 	_connect_bomb_signals()
@@ -43,13 +45,14 @@ func _spawn_local_player() -> void:
 	var player := Player.new()
 	player.id = LOCAL_PLAYER_ID
 	player.grid_position = game_map.get_spawn_position(0)
-	player.speed = balance.get_speed_for_character()
 	player_system.add_player(player)
 
 
 func _connect_bomb_signals() -> void:
 	bomb_system.block_destroyed.connect(func(pos): GameLogger.debug("Bloque destruido en: " + str(pos), "GameRoot"))
 	bomb_system.bomb_exploded.connect(func(pos, _cells): GameLogger.debug("Bomba explotó en: " + str(pos), "GameRoot"))
+	# Evento, no referencia directa entre systems (Golden Rule: "Prefer Events over direct system calls").
+	bomb_system.block_destroyed.connect(powerup_system.maybe_spawn_from_destroyed_block)
 
 
 func _inject_into_player_node() -> void:
@@ -84,7 +87,10 @@ func try_place_bomb() -> bool:
 	var player := player_system.get_player(LOCAL_PLAYER_ID)
 	if player == null or not player.alive:
 		return false
-	return bomb_system.place_bomb(player.grid_position, LOCAL_PLAYER_ID)
+
+	var bomb_range := player_system.get_effective_bomb_range(player)
+	var max_bombs := player_system.get_effective_max_bombs(player)
+	return bomb_system.place_bomb(player.grid_position, LOCAL_PLAYER_ID, bomb_range, max_bombs)
 
 
 func is_player_alive() -> bool:
@@ -108,7 +114,12 @@ func get_player_facing_direction() -> Vector2i:
 
 func get_player_speed() -> float:
 	var player := player_system.get_player(LOCAL_PLAYER_ID)
-	return player.speed if player != null else 0.0
+	return player_system.get_effective_speed(player) if player != null else 0.0
+
+
+func is_player_shielded() -> bool:
+	var player := player_system.get_player(LOCAL_PLAYER_ID)
+	return player != null and player_system.is_shielded(player)
 
 
 func get_player_move_progress() -> float:

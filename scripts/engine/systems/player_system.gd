@@ -29,6 +29,12 @@ func get_player(player_id: int) -> Player:
 func tick(_state: GameState) -> void:
 	for player in players.values():
 		_update_player(player)
+		_tick_shield(player)
+
+
+func _tick_shield(player: Player) -> void:
+	if player.shield_ticks_remaining > 0:
+		player.shield_ticks_remaining -= 1
 
 
 func set_move_direction(player_id: int, direction: Vector2i) -> void:
@@ -93,7 +99,7 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 	player.move_direction = direction
 	player.next_direction = Vector2i.ZERO
 	player.move_ticks_elapsed = 0
-	player.move_ticks_total = _ticks_for_speed(player.speed)
+	player.move_ticks_total = _ticks_for_speed(get_effective_speed(player))
 	player.is_moving = true
 	player.has_pending_move = true
 
@@ -122,13 +128,42 @@ func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	player.has_pending_move = false
 
 
-func apply_speed_multiplier(player_id: int, multiplier: float) -> void:
+func get_effective_speed(player: Player) -> float:
+	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack
+	return balance.get_speed_for_character() * (1.0 + bonus)
+
+
+func get_effective_bomb_range(player: Player) -> int:
+	return balance.get_bomb_range() + player.bomb_range_powerup_stacks * balance.powerups.bomb_range_bonus_per_stack
+
+
+func get_effective_max_bombs(player: Player) -> int:
+	return balance.max_bombs_per_player + player.extra_bomb_powerup_stacks * balance.powerups.extra_bomb_bonus_per_stack
+
+
+func is_shielded(player: Player) -> bool:
+	return player.shield_ticks_remaining > 0
+
+
+func apply_powerup(player_id: int, type: PowerUp.Type) -> void:
 	var player := get_player(player_id)
 
-	if player == null:
+	if player == null or not player.alive:
 		return
 
-	player.speed *= multiplier
+	match type:
+		PowerUp.Type.SPEED:
+			player.speed_powerup_stacks = mini(player.speed_powerup_stacks + 1, balance.powerups.speed_max_stacks)
+		PowerUp.Type.BOMB_RANGE:
+			player.bomb_range_powerup_stacks = mini(player.bomb_range_powerup_stacks + 1, balance.powerups.bomb_range_max_stacks)
+		PowerUp.Type.EXTRA_BOMB:
+			player.extra_bomb_powerup_stacks = mini(player.extra_bomb_powerup_stacks + 1, balance.powerups.extra_bomb_max_stacks)
+		PowerUp.Type.SHIELD:
+			player.shield_ticks_remaining = balance.powerups.shield_duration_ticks
+		_:
+			GameLogger.warning("Tipo de powerup desconocido: " + str(type), "PlayerSystem")
+
+	GameLogger.debug("Jugador %d recogió powerup tipo %s" % [player_id, str(type)], "PlayerSystem")
 
 
 func get_move_progress(player_id: int) -> float:
@@ -162,6 +197,9 @@ func apply_explosion_damage(danger_cells: Array[Vector2i], current_tick: int) ->
 				_respawn(player)
 			continue
 
+		if is_shielded(player):
+			continue
+
 		if player.grid_position in danger_cells:
 			_kill(player, current_tick)
 
@@ -179,6 +217,7 @@ func _kill(player: Player, current_tick: int) -> void:
 func _respawn(player: Player) -> void:
 	reset_to_position(player.id, game_map.get_spawn_position(player.id))
 	player.alive = true
+	player.shield_ticks_remaining = balance.spawn_invulnerability_ticks
 	GameLogger.debug("Jugador %d respawneó" % player.id, "PlayerSystem")
 
 

@@ -7,6 +7,43 @@ explica cómo se aterrizaron y por qué, para que se puedan revisar o
 revertir con contexto si el juego evoluciona (por ejemplo, si se migra de
 motor).
 
+## Balance base vs. balance de powerups: dos lugares separados a propósito
+
+**Decisión:** `GameBalance` sigue siendo la única fuente de la base del
+juego (`bomb_range_base`, `max_bombs_per_player`,
+`base_speed_cells_per_second`, etc. — igual para todos los jugadores).
+Se agregó `PowerUpBalance` (`config/powerup_balance.json` +
+`scripts/engine/core/powerup_balance.gd`) como el único lugar para
+balancear qué hace cada powerup: cuánto suma por stack y cuántas veces se
+puede stackear. `GameBalance.powerups: PowerUpBalance` lo compone, así
+`GameRoot` sigue teniendo un solo punto de carga
+(`GameBalance.load_from_file()`), pero balancear un powerup nunca implica
+tocar la config base ni viceversa.
+
+`Player` (domain) no guarda valores finales (velocidad, rango, etc.) —
+guarda **cuántos powerups de cada tipo acumuló**
+(`speed_powerup_stacks`, `bomb_range_powerup_stacks`,
+`extra_bomb_powerup_stacks`, `shield_ticks_remaining`). El valor efectivo
+siempre se deriva en el momento, en `PlayerSystem`
+(`get_effective_speed/bomb_range/max_bombs`), como
+`base (GameBalance) + stacks (Player) × bonus (PowerUpBalance)`. Nunca se
+cachea ni se muta un valor final — evita el bug de la vieja
+`apply_speed_multiplier()`, que mutaba `player.speed` permanentemente y no
+había forma de saber después cuál era la base.
+
+**Por qué:** pedido explícito para tener una arquitectura de balance clara
+y fácil de ajustar: un lugar para la base del juego, otro lugar aparte
+para los powerups, y que combinarlos sea una operación transparente
+(suma), no un efecto secundario oculto en el código de gameplay.
+
+Esto también resolvió `BombSystem.place_bomb()`: antes leía
+`balance.max_bombs_per_player` como un límite global; ahora recibe
+`bomb_range`/`max_bombs_for_owner` explícitos por llamada, calculados por
+el caller (`GameRoot`, vía `PlayerSystem.get_effective_*`). `BombSystem`
+no sabe nada de jugadores ni de powerups — solo de bombas — y evita un
+acoplamiento circular con `PlayerSystem` (que ya lo referencia a él para
+chequear colisiones).
+
 ## Tests unitarios con un runner propio, no un addon (GUT)
 
 **Decisión:** `tests/test_case.gd` (assertions básicas) + `tests/test_runner.gd`

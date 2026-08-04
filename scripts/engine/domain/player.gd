@@ -7,7 +7,13 @@ var grid_position: Vector2i
 var alive: bool = true
 var respawn_at_tick: int = -1
 
-var speed: float = 6.0  # celdas/segundo (config); se traduce a ticks al iniciar cada movimiento
+# Cuántos powerups de cada tipo acumuló. Nunca se guarda un valor final
+# (velocidad, rango, etc.) — siempre se deriva de balance base + estos
+# contadores (ver PlayerSystem.get_effective_*), así no hay estado "sucio".
+var speed_powerup_stacks: int = 0
+var bomb_range_powerup_stacks: int = 0
+var extra_bomb_powerup_stacks: int = 0
+var shield_ticks_remaining: int = 0
 
 var move_direction: Vector2i = Vector2i.ZERO
 var next_direction: Vector2i = Vector2i.ZERO

@@ -65,6 +65,10 @@ var reconciliation_enabled: bool = false
 
 var current_config_file: String = DEFAULT_CONFIG_PATH
 
+## Balance de powerups: config propia, separada a propósito. Ver
+## PowerUpBalance para el porqué.
+var powerups: PowerUpBalance = PowerUpBalance.new()
+
 enum CharacterType {
 	NORMAL,
 	FAST,
@@ -105,6 +109,7 @@ func load_config(path: String = DEFAULT_CONFIG_PATH) -> bool:
 		return false
 
 	_apply_config(json.data)
+	powerups.load_config()
 	print("✅ Configuración cargada desde: ", path)
 	_print_config_summary()
 	return true

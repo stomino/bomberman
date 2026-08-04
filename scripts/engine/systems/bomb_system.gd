@@ -65,12 +65,16 @@ func _is_spawn_position(x: int, y: int) -> bool:
 	return false
 
 
-func place_bomb(grid_pos: Vector2i, owner_id: int, custom_range: int = -1) -> bool:
+func place_bomb(grid_pos: Vector2i, owner_id: int, bomb_range: int, max_bombs_for_owner: int) -> bool:
 	"""
 	Reglas:
 	1. No puede haber dos bombas en la misma celda
 	2. La celda debe ser caminable
-	3. El jugador no puede tener más de max_bombs_per_player bombas activas
+	3. El jugador no puede tener más de max_bombs_for_owner bombas activas
+
+	bomb_range y max_bombs_for_owner son responsabilidad del caller (valores
+	efectivos del jugador, base + powerups) — BombSystem no sabe nada de
+	jugadores ni de powerups, solo de bombas.
 	"""
 	for bomb in bombs:
 		if bomb.grid_pos == grid_pos and bomb.active:
@@ -86,12 +90,11 @@ func place_bomb(grid_pos: Vector2i, owner_id: int, custom_range: int = -1) -> bo
 		if bomb.owner_id == owner_id and bomb.active:
 			player_bombs += 1
 
-	var max_bombs := balance.max_bombs_per_player
-	if player_bombs >= max_bombs:
-		GameLogger.debug("Jugador %d tiene máximo de bombas (%d)" % [owner_id, max_bombs], "BombSystem")
+	if player_bombs >= max_bombs_for_owner:
+		GameLogger.debug("Jugador %d tiene máximo de bombas (%d)" % [owner_id, max_bombs_for_owner], "BombSystem")
 		return false
 
-	var bomb := Bomb.new(grid_pos, owner_id, balance, custom_range)
+	var bomb := Bomb.new(grid_pos, owner_id, balance, bomb_range)
 	bombs.append(bomb)
 
 	GameLogger.debug("Bomba colocada en: %s | Dueño: %d | Timer: %d ticks" % [str(grid_pos), owner_id, bomb.timer], "BombSystem")

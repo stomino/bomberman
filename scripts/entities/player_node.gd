@@ -10,6 +10,8 @@ var game_root: GameRoot
 var _holding_direction: bool = false
 var _blocked_anim_progress: float = 0.0
 
+const SHIELD_TINT := Color(0.6, 0.8, 1.0)
+
 
 func set_game_root(root: GameRoot) -> void:
 	game_root = root
@@ -22,6 +24,8 @@ func _physics_process(delta: float) -> void:
 	visible = game_root.is_player_alive()
 	if not visible:
 		return
+
+	modulate = SHIELD_TINT if game_root.is_player_shielded() else Color.WHITE
 
 	_handle_movement_input()
 

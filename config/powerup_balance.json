@@ -1,0 +1,17 @@
+{
+    "speed": {
+        "bonus_per_stack": 0.25,
+        "max_stacks": 3
+    },
+    "bomb_range": {
+        "bonus_per_stack": 1,
+        "max_stacks": 4
+    },
+    "extra_bomb": {
+        "bonus_per_stack": 1,
+        "max_stacks": 4
+    },
+    "shield": {
+        "duration_ticks": 300
+    }
+}

@@ -26,11 +26,10 @@ func _make_balance() -> GameBalance:
 	return balance
 
 
-func _make_player(id: int, pos: Vector2i, balance: GameBalance) -> Player:
+func _make_player(id: int, pos: Vector2i, _balance: GameBalance) -> Player:
 	var player := Player.new()
 	player.id = id
 	player.grid_position = pos
-	player.speed = balance.get_speed_for_character()
 	return player
 
 
@@ -76,7 +75,7 @@ func test_player_cannot_move_into_bomb_cell() -> void:
 	var player := _make_player(0, Vector2i(2, 2), balance)
 	system.add_player(player)
 
-	bombs.place_bomb(Vector2i(3, 2), 1)
+	bombs.place_bomb(Vector2i(3, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	system.set_move_direction(0, Vector2i.RIGHT)
 
@@ -92,7 +91,7 @@ func test_player_dies_when_standing_in_explosion() -> void:
 	system.add_player(player)
 	var state := GameState.new()
 
-	bombs.place_bomb(Vector2i(3, 3), 0)
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	for i in range(3):  # timer = 3
 		state.tick += 1
@@ -113,7 +112,7 @@ func test_player_respawns_after_respawn_ticks() -> void:
 	system.add_player(player)
 	var state := GameState.new()
 
-	bombs.place_bomb(Vector2i(3, 3), 0)
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
 
 	while player.alive:
 		state.tick += 1
@@ -127,3 +126,117 @@ func test_player_respawns_after_respawn_ticks() -> void:
 
 	assert_true(player.alive, "debería haber respawneado")
 	assert_eq(player.grid_position, map.get_spawn_position(player.id))
+
+
+func test_effective_speed_increases_with_speed_stacks() -> void:
+	var balance := _make_balance()
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+
+	var base_speed := system.get_effective_speed(player)
+
+	system.apply_powerup(0, PowerUp.Type.SPEED)
+
+	assert_true(system.get_effective_speed(player) > base_speed, "un powerup de velocidad debería aumentar la velocidad efectiva")
+
+
+func test_powerup_stacks_are_capped_at_max_stacks() -> void:
+	var balance := _make_balance()
+	balance.powerups.speed_max_stacks = 2
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+
+	for i in range(5):
+		system.apply_powerup(0, PowerUp.Type.SPEED)
+
+	assert_eq(player.speed_powerup_stacks, 2, "no debería poder acumular más del máximo configurado")
+
+
+func test_effective_bomb_range_and_max_bombs_increase_with_powerups() -> void:
+	var balance := _make_balance()
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+
+	var base_range := system.get_effective_bomb_range(player)
+	var base_max_bombs := system.get_effective_max_bombs(player)
+
+	system.apply_powerup(0, PowerUp.Type.BOMB_RANGE)
+	system.apply_powerup(0, PowerUp.Type.EXTRA_BOMB)
+
+	assert_eq(system.get_effective_bomb_range(player), base_range + balance.powerups.bomb_range_bonus_per_stack)
+	assert_eq(system.get_effective_max_bombs(player), base_max_bombs + balance.powerups.extra_bomb_bonus_per_stack)
+
+
+func test_shield_prevents_death_from_explosion() -> void:
+	var balance := _make_balance()
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(3, 3), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	system.apply_powerup(0, PowerUp.Type.SHIELD)
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
+
+	for i in range(3):
+		state.tick += 1
+		system.tick(state)
+		bombs.tick(state)
+		system.apply_explosion_damage(bombs.get_danger_cells(), state.tick)
+
+	assert_true(player.alive, "el escudo debería haber evitado la muerte")
+
+
+func test_shield_expires_after_its_duration() -> void:
+	var balance := _make_balance()
+	balance.powerups.shield_duration_ticks = 2
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(3, 3), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	system.apply_powerup(0, PowerUp.Type.SHIELD)
+
+	for i in range(2):
+		state.tick += 1
+		system.tick(state)
+
+	assert_false(system.is_shielded(player), "el escudo debería haberse agotado tras shield_duration_ticks")
+
+
+func test_respawn_grants_temporary_invulnerability() -> void:
+	var balance := _make_balance()
+	balance.spawn_invulnerability_ticks = 999
+	var map := GameMap.new(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(3, 3), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
+
+	while player.alive:
+		state.tick += 1
+		system.tick(state)
+		bombs.tick(state)
+		system.apply_explosion_damage(bombs.get_danger_cells(), state.tick)
+
+	while state.tick < player.respawn_at_tick:
+		state.tick += 1
+		system.apply_explosion_damage(bombs.get_danger_cells(), state.tick)
+
+	assert_true(player.alive)
+	assert_true(system.is_shielded(player), "debería tener invulnerabilidad de spawn recién respawneado")
