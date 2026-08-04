@@ -14,8 +14,12 @@ func _init(game_map: GameMap, players: PlayerSystem, bombs: BombSystem, game_sta
 	state = game_state
 
 
-func tick(delta: float) -> void:
+func tick() -> void:
+	"""Un tick = una unidad discreta de simulación. Sin float de por medio:
+	determinismo requerido para servidor autoritativo (ver
+	docs/Product_Vision_and_Roadmap.md)."""
 	state.tick += 1
 
-	player_system.tick(state, delta)
-	bomb_system.tick(state, delta)
+	player_system.tick(state)
+	bomb_system.tick(state)
+	player_system.apply_explosion_damage(bomb_system.get_danger_cells(), state.tick)

@@ -16,8 +16,8 @@ const LOCAL_PLAYER_ID := 0
 func _ready() -> void:
 	balance = GameBalance.load_from_file()
 	game_map = GameMap.new(balance)
-	player_system = PlayerSystem.new(game_map)
 	bomb_system = BombSystem.new(game_map, balance)
+	player_system = PlayerSystem.new(game_map, balance, bomb_system)
 	game_manager = GameManager.new(game_map, player_system, bomb_system)
 
 	_spawn_local_player()
@@ -26,8 +26,8 @@ func _ready() -> void:
 	_inject_into_game_renderer()
 
 
-func _physics_process(delta: float) -> void:
-	game_manager.tick(delta)
+func _physics_process(_delta: float) -> void:
+	game_manager.tick()
 
 
 func _input(event: InputEvent) -> void:
@@ -82,9 +82,14 @@ func clear_player_input() -> void:
 
 func try_place_bomb() -> bool:
 	var player := player_system.get_player(LOCAL_PLAYER_ID)
-	if player == null:
+	if player == null or not player.alive:
 		return false
 	return bomb_system.place_bomb(player.grid_position, LOCAL_PLAYER_ID)
+
+
+func is_player_alive() -> bool:
+	var player := player_system.get_player(LOCAL_PLAYER_ID)
+	return player != null and player.alive
 
 
 func get_player_render_position() -> Vector2:
@@ -101,6 +106,10 @@ func get_player_facing_direction() -> Vector2i:
 	return player.facing_direction if player != null else Vector2i.DOWN
 
 
-func get_player_move_progress() -> float:
+func get_player_speed() -> float:
 	var player := player_system.get_player(LOCAL_PLAYER_ID)
-	return player.move_progress if player != null else 0.0
+	return player.speed if player != null else 0.0
+
+
+func get_player_move_progress() -> float:
+	return player_system.get_move_progress(LOCAL_PLAYER_ID)

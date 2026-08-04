@@ -7,6 +7,35 @@ explica cómo se aterrizaron y por qué, para que se puedan revisar o
 revertir con contexto si el juego evoluciona (por ejemplo, si se migra de
 motor).
 
+## El movimiento del jugador simula en ticks enteros, no en float
+
+**Decisión:** `Player.move_ticks_elapsed` / `Player.move_ticks_total` (int)
+reemplazan al viejo `move_progress: float`. `PlayerSystem._update_player()`
+incrementa el contador en 1 por tick — ya no acumula `speed * delta`. La
+cantidad de ticks que toma cruzar una celda se deriva una sola vez, al
+iniciar cada movimiento, con `roundi(balance.tick_rate / player.speed)`.
+`GameManager.tick()`, `PlayerSystem.tick()` y `BombSystem.tick()` perdieron
+el parámetro `delta` — ya no existe como concepto en la simulación.
+
+**Por qué:** `docs/Product_Vision_and_Roadmap.md` (el documento de
+producto) es explícito: *"La lógica trabajará únicamente con coordenadas
+enteras... no se utilizarán posiciones flotantes para la simulación. Esto
+simplifica sincronización online, reproducibilidad, determinismo y
+depuración."* El diseño anterior acumulaba `move_progress` con el `delta`
+real de Godot — funcionaba para un solo cliente, pero no garantiza que el
+mismo input produzca exactamente el mismo resultado en dos ejecuciones
+distintas (servidor vs. cliente), que es la base de cualquier esquema de
+predicción/reconciliación con servidor autoritativo (Fase 4+ del roadmap).
+`BombSystem` ya cumplía esto — sus timers siempre fueron enteros
+(`bomb_timer_base_ticks`, etc.); `PlayerSystem` era la única pieza que
+todavía dependía de tiempo real.
+
+La interpolación visual (`get_position_for_render`, la animación "en el
+lugar" de `player_node.gd`) sigue usando float — eso es Presentation, y el
+documento lo permite explícitamente ("las animaciones podrán interpolarse
+visualmente"). La regla es: el estado autoritativo nunca es float: solo su
+representación en pantalla puede serlo.
+
 ## GameBalance vive en Core como RefCounted inyectado, no como autoload
 
 **Decisión:** `GameBalance` (`scripts/engine/core/game_balance.gd`) es una

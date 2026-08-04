@@ -99,7 +99,7 @@ func place_bomb(grid_pos: Vector2i, owner_id: int, custom_range: int = -1) -> bo
 	return true
 
 
-func tick(_state: GameState, _delta: float) -> void:
+func tick(_state: GameState) -> void:
 	_tick_bombs()
 	_tick_explosions()
 
@@ -182,6 +182,14 @@ func _get_block_at(pos: Vector2i) -> DestructibleBlock:
 		if block.grid_pos == pos and block.alive:
 			return block
 	return null
+
+
+func get_danger_cells() -> Array[Vector2i]:
+	"""Todas las celdas cubiertas por una explosión activa este tick."""
+	var cells: Array[Vector2i] = []
+	for explosion in explosions:
+		cells.append_array(explosion.cells)
+	return cells
 
 
 func is_cell_occupied_by_bomb(pos: Vector2i) -> bool:
