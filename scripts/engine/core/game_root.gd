@@ -23,6 +23,7 @@ func _ready() -> void:
 	_spawn_local_player()
 	_connect_bomb_signals()
 	_inject_into_player_node()
+	_inject_into_game_renderer()
 
 
 func _physics_process(delta: float) -> void:
@@ -59,6 +60,14 @@ func _inject_into_player_node() -> void:
 		push_error("[GameRoot] No se encontró el nodo 'Player' hermano para inyectar dependencias.")
 
 
+func _inject_into_game_renderer() -> void:
+	var renderer := get_node_or_null("../GameRenderer")
+	if renderer and renderer.has_method("set_game_root"):
+		renderer.set_game_root(self)
+	else:
+		push_error("[GameRoot] No se encontró el nodo 'GameRenderer' hermano para inyectar dependencias.")
+
+
 # ============================================
 # API PARA PRESENTATION (Player node, etc.)
 # ============================================
@@ -87,9 +96,9 @@ func is_player_moving() -> bool:
 	return player != null and player.is_moving
 
 
-func get_player_move_direction() -> Vector2i:
+func get_player_facing_direction() -> Vector2i:
 	var player := player_system.get_player(LOCAL_PLAYER_ID)
-	return player.move_direction if player != null else Vector2i.ZERO
+	return player.facing_direction if player != null else Vector2i.DOWN
 
 
 func get_player_move_progress() -> float:

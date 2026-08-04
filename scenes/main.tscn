@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/engine/core/game_root.gd" id="1_o5qli"]
 [ext_resource type="Script" path="res://scripts/entities/player_node.gd" id="2_0wfyh"]
 [ext_resource type="Texture2D" uid="uid://bwxuyi7t2o3l5" path="res://assets/sprites/player/FOXSPRITESHEET.png" id="3_sugp2"]
+[ext_resource type="Script" path="res://scripts/entities/game_renderer.gd" id="4_gmrnd"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_o3hdr"]
 size = Vector2(32, 32)
@@ -257,8 +258,8 @@ animations = [{
 [node name="Main" type="Node2D" unique_id=1068630147]
 scale = Vector2(2, 2)
 
-[node name="TileMapLayer" type="TileMapLayer" parent="." unique_id=1796848460]
-collision_enabled = false
+[node name="GameRenderer" type="Node2D" parent="." unique_id=1796848460]
+script = ExtResource("4_gmrnd")
 
 [node name="GameRoot" type="Node" parent="." unique_id=600012035]
 script = ExtResource("1_o5qli")

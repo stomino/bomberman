@@ -24,7 +24,7 @@ func _physics_process(_delta: float) -> void:
 	else:
 		position = target_render_pos
 
-	_update_animation(game_root.is_player_moving(), game_root.get_player_move_direction())
+	_update_animation(game_root.is_player_moving(), game_root.get_player_facing_direction())
 
 
 func _handle_movement_input() -> void:

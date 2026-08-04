@@ -51,15 +51,32 @@ func set_move_direction(player_id: int, direction: Vector2i) -> void:
 	player.facing_direction = direction
 
 	if not player.is_moving:
-		player.move_direction = direction
-		player.move_progress = 0.0
-		player.is_moving = true
-		player.has_pending_move = true
-		player.next_direction = Vector2i.ZERO
+		_try_start_move(player, direction)
 	else:
 		if direction != player.move_direction:
 			player.next_direction = direction
 			player.has_pending_move = true
+
+
+func _try_start_move(player: Player, direction: Vector2i) -> void:
+	"""Arranca el movimiento hacia direction solo si la celda destino es
+	caminable. Si no lo es, el jugador queda quieto mirando hacia esa
+	dirección (facing_direction ya se seteó antes de llamar a esto)."""
+	var target := player.grid_position + direction
+
+	if not game_map.is_walkable(target.x, target.y):
+		player.move_direction = Vector2i.ZERO
+		player.next_direction = Vector2i.ZERO
+		player.move_progress = 0.0
+		player.is_moving = false
+		player.has_pending_move = false
+		return
+
+	player.move_direction = direction
+	player.next_direction = Vector2i.ZERO
+	player.move_progress = 0.0
+	player.is_moving = true
+	player.has_pending_move = true
 
 
 func clear_input(player_id: int) -> void:
@@ -128,14 +145,8 @@ func _update_player(player: Player, delta: float) -> void:
 		player.move_progress = 0.0
 
 		if player.next_direction != Vector2i.ZERO:
-
-			player.move_direction = player.next_direction
-			player.next_direction = Vector2i.ZERO
-			player.is_moving = true
-			player.has_pending_move = true
-
+			_try_start_move(player, player.next_direction)
 		else:
-
 			player.is_moving = false
 			player.has_pending_move = false
 
