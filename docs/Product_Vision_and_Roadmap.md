@@ -180,7 +180,7 @@ desde el inicio.
 |---|---|---|
 | 1 | Movimiento, colisiones, grilla | ✅ Hecho |
 | 2 | Bombas, explosiones, bloques destructibles | ✅ Hecho |
-| 3 | PowerUps, reglas completas, sistema de rondas | 🔶 PowerUps hechos; sistema de rondas en curso |
+| 3 | PowerUps, reglas completas, sistema de rondas | ✅ Hecho |
 | 3.5 | Editor de mapas | ✅ Primera versión (pintar/guardar/cargar/jugar) |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | Pendiente |
 | 5 | Multiplayer LAN | Pendiente |
@@ -189,6 +189,88 @@ desde el inicio.
 | 8 | Bots, IA | Pendiente |
 | 9 | Steam | Pendiente |
 | 10 | Balance, beta cerrada, optimización, lanzamiento | Pendiente |
+
+## Ideas futuras (backlog, no implementar todavía)
+
+Registradas para no perderlas entre sesiones de chat. Ninguna de estas
+requiere replantear la arquitectura actual — encajan sobre lo que ya
+existe siguiendo los mismos patrones ya establecidos (config separada por
+concern, systems nuevos coordinados por GameManager, orígenes
+intercambiables para datos como GameMap). Se listan con una nota de qué
+tan grande es cada una y qué decisiones de diseño van a hacer falta
+cuando se construyan.
+
+### Partidas
+
+**Categorías:** Competitivo (balance ajustado según preferencia de
+jugadores), Casual, Personalizada (Bot/IA, modo, balance modificable,
+mapa específico o procedural).
+
+**Modos:** 1v1, 1v1v1v1 (FFA), Duos 2v2, Equipo 3v3.
+
+- Multi-jugador (FFA): ya soportado — `PlayerSystem` es un diccionario
+  por id, no asume un solo jugador, ya probado con 2 en los tests de
+  rondas.
+- Balance por categoría: ya soportado — `GameBalance`/`PowerUpBalance`
+  ya reciben la ruta del JSON como parámetro; solo hace falta tener
+  varios archivos de config (`balance_competitivo.json`, etc.) y elegir
+  cuál cargar.
+- Mapa específico en personalizada: ya soportado, es lo que ya
+  construimos en el editor de mapas (Fase 3.5).
+- Bots/IA: arquitectónicamente "otro Player controlado por un módulo de
+  decisión en vez de por input humano" — llamaría a la misma API de
+  `GameRoot`. Coincide con el orden ya planeado (Fase 8, después de
+  Multiplayer y Balance).
+- Equipos (Duos/Equipo): necesita `team_id` en `Player` y cambiar la
+  condición de victoria de ronda ("queda 1 jugador vivo") a ("queda 1
+  equipo con algún jugador vivo") — extensión acotada de
+  `GameManager._check_round_end()`.
+- Mapas procedurales de verdad (aleatorios, no el único patrón fijo de
+  hoy): sería un tercer origen de `GameMap`, ej.
+  `GameMap.from_procedural_generation(seed, params)` — mismo patrón que
+  `from_balance`/`from_definition`.
+- Sistema de ELO/matchmaking/preferencia de jugadores: vive fuera del
+  cliente Godot a propósito (es el "Servidor de Matchmaking" del propio
+  documento, Fase 6/7). El cliente solo necesitaría reportar resultados
+  — `GameManager.match_ended` y `Player.rounds_won` ya son el tipo de
+  dato que un backend de stats querría recibir. No hace falta telemetría
+  automatizada antes de tener jugadores reales; una encuesta manual
+  alcanza para empezar.
+
+### Habilidades (loadout pre-partida)
+
+Cada jugador elige 2 habilidades antes de entrar: una disponible de
+entrada, la segunda se desbloquea al cumplir un objetivo en la ronda
+(llegar a un lugar, destruir una estructura especial, o un tiempo fijo
+como 30 segundos). Es la pieza que más le da identidad competitiva
+propia al juego (a diferencia de Bomberman clásico). Lista inicial a
+seguir expandiendo: empujar bombas, multiplicador de velocidad inicial,
+flash hacia adelante (salta 1 casilla, ignora colisión), dash hacia
+adelante (1 casilla más lejos, respeta colisión).
+
+Es un feature de tamaño comparable a powerups + rondas juntos — no un
+agregado chico. Encaja con el mismo patrón ya usado para separar
+`PowerUpBalance` de `GameBalance`: un dominio nuevo (`Ability`), un
+balance propio, un system (o extensión de `PlayerSystem`) para
+desbloqueo y activación.
+
+Decisiones de diseño reales que van a aparecer (no resueltas todavía):
+
+- **Empujar bombas** rompe la regla actual de "nunca se puede pisar una
+  bomba" — necesita una rama de lógica nueva (desplazar la bomba en vez
+  de bloquear el movimiento) y resolver qué pasa si la bomba empujada
+  choca contra otra bomba, una pared, o un jugador.
+- **Flash** es una primitiva de movimiento nueva, no una extensión de la
+  actual: el movimiento por tick asume siempre una celda adyacente
+  validada. Falta decidir si valida solo la celda de aterrizaje (no la
+  de en medio) y qué pasa si esa celda tiene una bomba o está fuera del
+  mapa. **Dash** es más simple: básicamente 2 celdas en vez de 1,
+  respetando colisión igual que hoy.
+- Los objetivos de desbloqueo por ubicación o estructura especial
+  encajan extendiendo `MapDefinition` (posiciones de objetivo, mismo
+  patrón que `spawn_positions`, incluso pintable en el editor) y
+  `DestructibleBlock` (una variante especial), respectivamente. El
+  desbloqueo por tiempo ya es trivial con `state.tick`.
 
 ## Forma de trabajo para los futuros chats
 
