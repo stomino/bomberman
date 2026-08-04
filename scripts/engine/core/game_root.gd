@@ -4,6 +4,7 @@ extends Node
 ## Composition root: único lugar donde se crean e inyectan las dependencias
 ## de gameplay (Golden Rule 8: "Dependencies are injected").
 
+var balance: GameBalance
 var game_map: GameMap
 var player_system: PlayerSystem
 var bomb_system: BombSystem
@@ -13,9 +14,10 @@ const LOCAL_PLAYER_ID := 0
 
 
 func _ready() -> void:
-	game_map = GameMap.new()
+	balance = GameBalance.load_from_file()
+	game_map = GameMap.new(balance)
 	player_system = PlayerSystem.new(game_map)
-	bomb_system = BombSystem.new(game_map)
+	bomb_system = BombSystem.new(game_map, balance)
 	game_manager = GameManager.new(game_map, player_system, bomb_system)
 
 	_spawn_local_player()
@@ -30,9 +32,9 @@ func _physics_process(delta: float) -> void:
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.keycode == KEY_F1:
-			GameBalance.toggle_debug_mode()
-		elif event.keycode == KEY_F5 and GameBalance.debug_mode:
-			GameBalance.reload_config()
+			GameLogger.toggle_enabled()
+		elif event.keycode == KEY_F5 and GameLogger.enabled:
+			balance.reload()
 			GameLogger.info("Configuración recargada", "GameRoot")
 
 
@@ -40,7 +42,7 @@ func _spawn_local_player() -> void:
 	var player := Player.new()
 	player.id = LOCAL_PLAYER_ID
 	player.grid_position = game_map.get_spawn_position(0)
-	player.speed = GameBalance.get_speed_for_character()
+	player.speed = balance.get_speed_for_character()
 	player_system.add_player(player)
 
 

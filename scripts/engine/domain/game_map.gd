@@ -11,20 +11,23 @@ var cell_size: int
 
 var grid: Array[Array] = []
 
-
-func _init(map_width: int = GameBalance.map_width, map_height: int = GameBalance.map_height, map_cell_size: int = GameBalance.cell_size) -> void:
-	width = map_width
-	height = map_height
-	cell_size = map_cell_size
-	_build_grid()
+var _balance: GameBalance
 
 
-func _build_grid() -> void:
+func _init(balance: GameBalance) -> void:
+	_balance = balance
+	width = balance.map_width
+	height = balance.map_height
+	cell_size = balance.cell_size
+	_build_grid(balance.indestructible_border)
+
+
+func _build_grid(indestructible_border: bool) -> void:
 	grid = []
 	for y in range(height):
 		var row: Array[int] = []
 		for x in range(width):
-			if GameBalance.indestructible_border and (x == 0 or x == width - 1 or y == 0 or y == height - 1):
+			if indestructible_border and (x == 0 or x == width - 1 or y == 0 or y == height - 1):
 				row.append(CELL_INDESTRUCTIBLE)
 			else:
 				row.append(CELL_EMPTY)
@@ -74,7 +77,7 @@ func world_to_grid(world_pos: Vector2) -> Vector2i:
 
 
 func get_spawn_position(spawn_index: int) -> Vector2i:
-	return GameBalance.get_spawn_position(spawn_index)
+	return _balance.get_spawn_position(spawn_index)
 
 
 func count_cells(value: int) -> int:

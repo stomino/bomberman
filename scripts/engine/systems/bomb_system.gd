@@ -2,6 +2,7 @@ class_name BombSystem
 extends RefCounted
 
 var game_map: GameMap
+var balance: GameBalance
 
 var bombs: Array[Bomb] = []
 var explosions: Array[Explosion] = []
@@ -14,16 +15,17 @@ signal explosion_started(cells: Array)
 signal explosion_ended(cells: Array)
 
 
-func _init(map: GameMap) -> void:
+func _init(map: GameMap, game_balance: GameBalance) -> void:
 	game_map = map
+	balance = game_balance
 	_initialize_destructible_blocks()
 
 
 func _initialize_destructible_blocks() -> void:
-	if not GameBalance.destructible_pattern_enabled:
+	if not balance.destructible_pattern_enabled:
 		return
 
-	var pattern = GameBalance.destructible_pattern
+	var pattern = balance.destructible_pattern
 	if pattern.is_empty():
 		return
 
@@ -51,7 +53,7 @@ func _initialize_destructible_blocks() -> void:
 
 
 func _is_spawn_position(x: int, y: int) -> bool:
-	for spawn in GameBalance.spawn_positions:
+	for spawn in balance.spawn_positions:
 		if spawn.x == x and spawn.y == y:
 			return true
 
@@ -84,12 +86,12 @@ func place_bomb(grid_pos: Vector2i, owner_id: int, custom_range: int = -1) -> bo
 		if bomb.owner_id == owner_id and bomb.active:
 			player_bombs += 1
 
-	var max_bombs := GameBalance.max_bombs_per_player
+	var max_bombs := balance.max_bombs_per_player
 	if player_bombs >= max_bombs:
 		GameLogger.debug("Jugador %d tiene máximo de bombas (%d)" % [owner_id, max_bombs], "BombSystem")
 		return false
 
-	var bomb := Bomb.new(grid_pos, owner_id, custom_range)
+	var bomb := Bomb.new(grid_pos, owner_id, balance, custom_range)
 	bombs.append(bomb)
 
 	GameLogger.debug("Bomba colocada en: %s | Dueño: %d | Timer: %d ticks" % [str(grid_pos), owner_id, bomb.timer], "BombSystem")
@@ -153,13 +155,13 @@ func _generate_explosion(bomb: Bomb) -> void:
 
 			affected_cells.append(check_pos)
 
-	var explosion := Explosion.new(affected_cells)
+	var explosion := Explosion.new(affected_cells, balance)
 	explosions.append(explosion)
 
 	bomb_exploded.emit(bomb.grid_pos, affected_cells)
 	explosion_started.emit(affected_cells)
 
-	if GameBalance.chain_explosions:
+	if balance.chain_explosions:
 		_check_chain_explosions(affected_cells)
 
 
@@ -169,8 +171,8 @@ func _check_chain_explosions(cells: Array[Vector2i]) -> void:
 			if not bomb.active:
 				continue
 			if bomb.grid_pos == cell:
-				if GameBalance.chain_delay_ticks > 0:
-					bomb.timer = min(bomb.timer, GameBalance.chain_delay_ticks)
+				if balance.chain_delay_ticks > 0:
+					bomb.timer = min(bomb.timer, balance.chain_delay_ticks)
 				else:
 					bomb.timer = 0
 
