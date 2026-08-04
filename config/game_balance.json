@@ -1,0 +1,73 @@
+{
+    "movement": {
+        "base_speed_cells_per_second": 6.0,
+        "speed_multiplier_global": 1.0,
+        "character_speeds": {
+            "normal": 1.0,
+            "fast": 1.25,
+            "tank": 0.8
+        }
+    },
+    "bombs": {
+        "timer_base_ticks": 150,
+        "timer_min_ticks": 30,
+        "timer_max_ticks": 300,
+        "range_base": 1,
+        "range_min": 1,
+        "range_max": 7,
+        "max_bombs_per_player": 1
+    },
+    "explosions": {
+        "duration_base_ticks": 30,
+        "duration_min_ticks": 5,
+        "duration_max_ticks": 90,
+        "damage": 1,
+        "chain_explosions": true,
+        "chain_delay_ticks": 5
+    },
+    "destructible_blocks": {
+        "drop_chance": 0.3,
+        "powerup_distribution": {
+            "speed": 0.25,
+            "bomb_range": 0.25,
+            "extra_bomb": 0.20,
+            "shield": 0.10,
+            "none": 0.20
+        }
+    },
+    "map": {
+        "width": 13,
+        "height": 11,
+        "cell_size": 32,
+        "spawn_positions": [
+            {"x": 1, "y": 1},
+            {"x": 12, "y": 1},
+            {"x": 1, "y": 10},
+            {"x": 12, "y": 10}
+        ],
+        "indestructible_border": true,
+        "destructible_pattern": {
+            "enabled": true,
+            "pattern": [
+                [false, true, false, true, false],
+                [true, false, true, false, true],
+                [false, true, false, true, false]
+            ]
+        }
+    },
+    "player": {
+        "spawn_invulnerability_ticks": 60,
+        "max_players": 4,
+        "respawn_ticks": 120
+    },
+    "game": {
+        "tick_rate": 60,
+        "round_time_seconds": 120,
+        "overtime_seconds": 30
+    },
+    "server": {
+        "authoritative": true,
+        "prediction_enabled": false,
+        "reconciliation_enabled": false
+    }
+}
