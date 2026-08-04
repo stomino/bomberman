@@ -1,34 +1,3 @@
-﻿# Godot 4+ specific
+# Godot 4+ specific ignores
 .godot/
-export/
-*.import
-*.godot
-*.gen.*
-*.uid
-*.stamp
-
-# Editor temporary files
-*.tmp
-*.log
-*.pid
-*.lock
-*.session
-*.tmp/
-*.backup/
-
-# System files
-.DS_Store
-Thumbs.db
-desktop.ini
-
-# User-specific editor settings
-**/.editorconfig
-**/*.vscode/
-**/.vs/
-**/*.code-workspace
-
-# Godot project specific
-.project.godot
-.import/
-.env
-.env.local
+/android/
