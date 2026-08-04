@@ -24,6 +24,10 @@ var _maps_option: OptionButton
 var _status_label: Label
 var _tool_buttons: Dictionary = {}
 
+var _content_container: VBoxContainer
+var _toggle_button: Button
+var _panel_open: bool = true
+
 
 func _ready() -> void:
 	_definition = MapDefinition.create_empty(DEFAULT_WIDTH, DEFAULT_HEIGHT)
@@ -39,18 +43,25 @@ func _build_ui() -> void:
 	panel.position = Vector2(8, 8)
 	ui_layer.add_child(panel)
 
-	var vbox := VBoxContainer.new()
-	panel.add_child(vbox)
+	var outer_vbox := VBoxContainer.new()
+	panel.add_child(outer_vbox)
+
+	_toggle_button = Button.new()
+	_toggle_button.pressed.connect(_on_toggle_panel_pressed)
+	outer_vbox.add_child(_toggle_button)
+
+	_content_container = VBoxContainer.new()
+	outer_vbox.add_child(_content_container)
 
 	var tools_row := HBoxContainer.new()
-	vbox.add_child(tools_row)
-	_add_tool_button(tools_row, "Piso", GameMap.CELL_EMPTY)
+	_content_container.add_child(tools_row)
+	_add_tool_button(tools_row, "Borrar (Piso)", GameMap.CELL_EMPTY)
 	_add_tool_button(tools_row, "Pared", GameMap.CELL_INDESTRUCTIBLE)
 	_add_tool_button(tools_row, "Bloque", GameMap.CELL_DESTRUCTIBLE)
 	_add_tool_button(tools_row, "Spawn", TOOL_SPAWN)
 
 	var name_row := HBoxContainer.new()
-	vbox.add_child(name_row)
+	_content_container.add_child(name_row)
 	var name_label := Label.new()
 	name_label.text = "Nombre:"
 	name_row.add_child(name_label)
@@ -60,7 +71,7 @@ func _build_ui() -> void:
 	name_row.add_child(_name_edit)
 
 	var actions_row := HBoxContainer.new()
-	vbox.add_child(actions_row)
+	_content_container.add_child(actions_row)
 
 	var save_button := Button.new()
 	save_button.text = "Guardar"
@@ -88,9 +99,10 @@ func _build_ui() -> void:
 	actions_row.add_child(menu_button)
 
 	_status_label = Label.new()
-	vbox.add_child(_status_label)
+	_content_container.add_child(_status_label)
 
 	_update_tool_buttons()
+	_update_toggle_button()
 
 
 func _add_tool_button(parent: Node, label: String, tool_value: int) -> void:
@@ -112,8 +124,20 @@ func _update_tool_buttons() -> void:
 		_tool_buttons[tool_value].button_pressed = (tool_value == _current_tool)
 
 
+func _on_toggle_panel_pressed() -> void:
+	_panel_open = not _panel_open
+	_content_container.visible = _panel_open
+	_update_toggle_button()
+
+
+func _update_toggle_button() -> void:
+	_toggle_button.text = "▾ Ocultar panel (Tab)" if _panel_open else "▸ Mostrar panel (Tab)"
+
+
 func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
+		_on_toggle_panel_pressed()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		_paint_at_screen_position(event.position)
 
 
