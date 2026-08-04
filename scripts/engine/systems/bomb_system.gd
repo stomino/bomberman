@@ -145,9 +145,13 @@ func _generate_explosion(bomb: Bomb) -> void:
 			if game_map.is_indestructible(check_pos.x, check_pos.y):
 				break
 
-			var block = _get_block_at(check_pos)
-			if block and block.alive:
-				block.destroy()
+			if game_map.is_destructible(check_pos.x, check_pos.y):
+				# GameMap es la única fuente de verdad de qué celda es
+				# destructible; destructible_blocks es solo el índice para
+				# encontrar el objeto DestructibleBlock asociado (si existe).
+				var block := _get_block_at(check_pos)
+				if block:
+					block.destroy()
 				game_map.set_cell(check_pos.x, check_pos.y, GameMap.CELL_EMPTY)
 				block_destroyed.emit(check_pos)
 				affected_cells.append(check_pos)

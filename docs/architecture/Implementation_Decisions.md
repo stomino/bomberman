@@ -7,6 +7,39 @@ explica cómo se aterrizaron y por qué, para que se puedan revisar o
 revertir con contexto si el juego evoluciona (por ejemplo, si se migra de
 motor).
 
+## Tests unitarios con un runner propio, no un addon (GUT)
+
+**Decisión:** `tests/test_case.gd` (assertions básicas) + `tests/test_runner.gd`
+(descubre y corre todo lo que hay en `tests/unit/*.gd`, sin editor ni
+escena). Se corre con:
+
+```
+godot --headless --path . -s tests/test_runner.gd
+```
+
+Sale con código 1 si algo falla (para CI más adelante), 0 si todo pasa.
+
+**Por qué:** Domain y Systems son `RefCounted` puro, sin dependencias de
+Godot — se pueden instanciar y testear directo, igual que ya veníamos
+validando por CLI durante todo el desarrollo. Un addon como GUT da mejor
+reporting y es el estándar de la comunidad, pero suma una dependencia
+externa (descarga, versionado, compatibilidad con 4.7) para resolver un
+problema que un runner de ~70 líneas ya resuelve. Si el equipo necesita
+más adelante mocks, fixtures más ricos, o integración con un pipeline de
+CI más sofisticado, migrar a GUT es una decisión reversible — nada en los
+tests actuales depende de la implementación del runner, solo de
+`TestCase.assert_*`.
+
+**Nota real que encontraron los tests apenas se escribieron:** el primer
+test de `BombSystem` reveló que la explosión reconocía bloques
+destructibles únicamente a través de su propia lista interna
+`destructible_blocks`, no a través de `GameMap.is_destructible()` — dos
+fuentes de verdad para el mismo dato, en contra de la regla "one owner
+per piece of data" del spec. Se corrigió para que `GameMap` sea la única
+fuente de verdad de qué celda es destructible (ver commit correspondiente
+a esta fecha). Vale como ejemplo concreto de por qué esta fase se hizo
+antes de seguir apilando features de Fase 3 encima.
+
 ## El movimiento del jugador simula en ticks enteros, no en float
 
 **Decisión:** `Player.move_ticks_elapsed` / `Player.move_ticks_total` (int)
