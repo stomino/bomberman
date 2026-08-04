@@ -26,7 +26,7 @@ func _make_balance() -> GameBalance:
 
 func test_place_bomb_succeeds_on_walkable_cell() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 
 	var placed := bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
@@ -37,7 +37,7 @@ func test_place_bomb_succeeds_on_walkable_cell() -> void:
 
 func test_cannot_place_two_bombs_same_cell() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 
 	bombs.place_bomb(Vector2i(3, 3), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
@@ -49,7 +49,7 @@ func test_cannot_place_two_bombs_same_cell() -> void:
 
 func test_respects_max_bombs_per_player() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 
 	bombs.place_bomb(Vector2i(2, 2), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
@@ -60,7 +60,7 @@ func test_respects_max_bombs_per_player() -> void:
 
 func test_max_bombs_is_per_call_not_global() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 
 	bombs.place_bomb(Vector2i(2, 2), 0, balance.get_bomb_range(), 2)  # a este jugador le pasan max_bombs=2
@@ -71,7 +71,7 @@ func test_max_bombs_is_per_call_not_global() -> void:
 
 func test_cannot_place_on_indestructible_cell() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 
 	var placed := bombs.place_bomb(Vector2i(0, 0), 0, balance.get_bomb_range(), balance.max_bombs_per_player)
@@ -82,7 +82,7 @@ func test_cannot_place_on_indestructible_cell() -> void:
 func test_explosion_destroys_destructible_block_and_stops() -> void:
 	var balance := _make_balance()
 	balance.bomb_range_base = 3  # suficiente para llegar a (5,3) si no se detuviera en (4,3)
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	map.set_cell(4, 3, GameMap.CELL_DESTRUCTIBLE)
 	map.set_cell(5, 3, GameMap.CELL_DESTRUCTIBLE)
 	var bombs := BombSystem.new(map, balance)
@@ -100,7 +100,7 @@ func test_explosion_destroys_destructible_block_and_stops() -> void:
 
 func test_explosion_stops_at_indestructible_border() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var state := GameState.new()
 
@@ -115,7 +115,7 @@ func test_explosion_stops_at_indestructible_border() -> void:
 func test_chain_explosion_detonates_nearby_bomb_before_its_natural_timer() -> void:
 	var balance := _make_balance()
 	balance.bomb_timer_base_ticks = 5
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var state := GameState.new()
 

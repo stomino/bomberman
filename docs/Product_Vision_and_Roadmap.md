@@ -181,7 +181,7 @@ desde el inicio.
 | 1 | Movimiento, colisiones, grilla | ✅ Hecho |
 | 2 | Bombas, explosiones, bloques destructibles | ✅ Hecho |
 | 3 | PowerUps, reglas completas, sistema de rondas | 🔶 PowerUps hechos; sistema de rondas en curso |
-| 3.5 | Editor de mapas | Pendiente |
+| 3.5 | Editor de mapas | ✅ Primera versión (pintar/guardar/cargar/jugar) |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | Pendiente |
 | 5 | Multiplayer LAN | Pendiente |
 | 6 | Servidor dedicado, juego por Internet | Pendiente |

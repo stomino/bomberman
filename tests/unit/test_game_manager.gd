@@ -30,7 +30,7 @@ func _make_balance() -> GameBalance:
 
 
 func _make_manager(balance: GameBalance) -> GameManager:
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var players := PlayerSystem.new(map, balance, bombs)
 	var powerups := PowerUpSystem.new(balance)

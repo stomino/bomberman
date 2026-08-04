@@ -7,6 +7,54 @@ explica cómo se aterrizaron y por qué, para que se puedan revisar o
 revertir con contexto si el juego evoluciona (por ejemplo, si se migra de
 motor).
 
+## Editor de mapas (Fase 3.5): MapDefinition como segundo origen de GameMap
+
+**Decisión:** `GameMap` ya no tiene un único constructor balance-driven —
+tiene dos factories estáticas intercambiables: `GameMap.from_balance(balance)`
+(el camino procedural de siempre, mismo comportamiento exacto que antes,
+solo renombrado) y `GameMap.from_definition(definition)` (nuevo: un mapa
+completo hecho a mano, `MapDefinition`, cargado desde `maps/*.json`).
+`regenerate()` recuerda de qué origen vino cada instancia y reconstruye
+la grilla igual — con balance, vuelve a borde+vacío (los destructibles los
+repone `BombSystem`); con un `MapDefinition`, vuelve a la grilla completa
+tal como la pintó su autor (destructibles incluidos, ya que ahí SÍ forman
+parte del mapa, no de un patrón separado).
+
+`MapDefinition` es una clase nueva, separada de `GameBalance` a
+propósito: es contenido (el diseño concreto de un mapa), no config
+numérica de balance — mismo principio que ya se aplicó separando
+`PowerUpBalance` de `GameBalance`.
+
+`BombSystem` recibió un parámetro `populate_from_balance_pattern`
+(default `true`, no rompe nada existente): en `false` no superpone el
+patrón centrado de `GameBalance` sobre un mapa custom, porque ahí el
+autor del mapa ya pintó sus propios bloques destructibles directamente en
+la grilla — superponer el patrón genérico encima podría pintar sobre
+paredes puestas a propósito.
+
+**Selección de mapa entre escenas:** el menú principal guarda la ruta del
+mapa elegido en `get_tree().root.set_meta("selected_map_path", ...)`
+antes de cambiar a la escena de Sandbox; `GameRoot` la lee en `_ready()`.
+Se evitó deliberadamente un autoload nuevo para esto — ya se había sacado
+uno (`GameBalance`) por las razones documentadas más abajo, habría sido
+contradictorio reintroducir esa forma de acoplamiento por un dato que
+solo hace falta una vez, al cambiar de escena.
+
+**UI construida por código, no a mano en `.tscn`:** tanto el menú como el
+editor arman sus `Button`/`Container`/`OptionButton` en `_ready()` vía
+GDScript en vez de definirlos en el archivo de escena. Es más confiable
+de producir sin poder ver el editor de Godot visualmente, y es una
+práctica normal para herramientas (no para UI final de producto, donde sí
+valdría la pena diseñarla a mano en el editor más adelante).
+
+**Qué quedó explícitamente fuera de esta primera pasada** (para no
+sobre-alcanzar el pedido original): redimensionar un mapa ya creado
+(`Nuevo` siempre crea 13x11), soporte de scroll/zoom para mapas más
+grandes que la ventana, y guardar mapas de jugadores en `user://` en vez
+de `res://` (hace falta el día que se exporte el juego, porque `res://`
+es de solo lectura en un build empaquetado — hoy corremos siempre desde
+el árbol de fuentes, así que no es un problema todavía).
+
 ## Sistema de rondas: reglas simples, decididas por el dueño del producto
 
 **Decisión:** ronda termina cuando queda un solo jugador vivo (gana, suma

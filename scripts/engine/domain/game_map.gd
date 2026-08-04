@@ -11,15 +11,47 @@ var cell_size: int
 
 var grid: Array[Array] = []
 
+var _spawn_positions: Array[Vector2i] = []
+
+# GameMap puede venir de dos orígenes intercambiables: la generación
+# procedural de siempre (GameBalance) o un mapa hecho a mano (editor,
+# MapDefinition). regenerate() recuerda cuál para poder reconstruir la
+# grilla igual (usado al empezar una ronda nueva).
 var _balance: GameBalance
+var _definition: MapDefinition
 
 
-func _init(balance: GameBalance) -> void:
-	_balance = balance
-	width = balance.map_width
-	height = balance.map_height
-	cell_size = balance.cell_size
-	_build_grid(balance.indestructible_border)
+static func from_balance(balance: GameBalance) -> GameMap:
+	var map := GameMap.new()
+	map._balance = balance
+	map.width = balance.map_width
+	map.height = balance.map_height
+	map.cell_size = balance.cell_size
+	map._spawn_positions.assign(balance.spawn_positions)
+	map.regenerate()
+	return map
+
+
+static func from_definition(definition: MapDefinition) -> GameMap:
+	var map := GameMap.new()
+	map._definition = definition
+	map.width = definition.width
+	map.height = definition.height
+	map.cell_size = definition.cell_size
+	map._spawn_positions.assign(definition.spawn_positions)
+	map.regenerate()
+	return map
+
+
+func regenerate() -> void:
+	"""Vuelve la grilla a su estado original. Con balance: borde + vacío,
+	sin bloques destructibles (quien los repone es
+	BombSystem.reset_round()). Con un MapDefinition: la grilla completa tal
+	como la pintó el autor del mapa, incluidos sus bloques destructibles."""
+	if _definition != null:
+		grid = _copy_cells(_definition.cells)
+	else:
+		_build_grid(_balance.indestructible_border)
 
 
 func _build_grid(indestructible_border: bool) -> void:
@@ -34,11 +66,13 @@ func _build_grid(indestructible_border: bool) -> void:
 		grid.append(row)
 
 
-func regenerate() -> void:
-	"""Vuelve la grilla a su estado original (borde + vacío), sin bloques
-	destructibles. Usado al empezar una ronda nueva; quien vuelve a poner
-	el patrón de bloques es BombSystem.reset_round()."""
-	_build_grid(_balance.indestructible_border)
+func _copy_cells(source: Array) -> Array:
+	var copy: Array[Array] = []
+	for row in source:
+		var row_copy: Array[int] = []
+		row_copy.assign(row)
+		copy.append(row_copy)
+	return copy
 
 
 func is_within_bounds(grid_x: int, grid_y: int) -> bool:
@@ -84,7 +118,9 @@ func world_to_grid(world_pos: Vector2) -> Vector2i:
 
 
 func get_spawn_position(spawn_index: int) -> Vector2i:
-	return _balance.get_spawn_position(spawn_index)
+	if spawn_index < _spawn_positions.size():
+		return _spawn_positions[spawn_index]
+	return Vector2i(1, 1)
 
 
 func count_cells(value: int) -> int:

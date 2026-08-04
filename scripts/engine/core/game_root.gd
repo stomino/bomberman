@@ -13,11 +13,13 @@ var game_manager: GameManager
 
 const LOCAL_PLAYER_ID := 0
 
+var _map_is_custom: bool = false
+
 
 func _ready() -> void:
 	balance = GameBalance.load_from_file()
-	game_map = GameMap.new(balance)
-	bomb_system = BombSystem.new(game_map, balance)
+	game_map = _create_game_map()
+	bomb_system = BombSystem.new(game_map, balance, not _map_is_custom)
 	player_system = PlayerSystem.new(game_map, balance, bomb_system)
 	powerup_system = PowerUpSystem.new(balance)
 	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system, balance)
@@ -35,11 +37,33 @@ func _physics_process(_delta: float) -> void:
 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
-		if event.keycode == KEY_F1:
+		if event.keycode == KEY_ESCAPE:
+			get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+		elif event.keycode == KEY_F1:
 			GameLogger.toggle_enabled()
 		elif event.keycode == KEY_F5 and GameLogger.enabled:
 			balance.reload()
 			GameLogger.info("Configuración recargada", "GameRoot")
+
+
+func _create_game_map() -> GameMap:
+	var map_path := _selected_map_path()
+
+	if map_path != "":
+		var definition := MapDefinition.load_from_file(map_path)
+		if definition != null:
+			_map_is_custom = true
+			return GameMap.from_definition(definition)
+		push_error("[GameRoot] No se pudo cargar el mapa '%s', uso el mapa por defecto." % map_path)
+
+	_map_is_custom = false
+	return GameMap.from_balance(balance)
+
+
+func _selected_map_path() -> String:
+	if get_tree().root.has_meta("selected_map_path"):
+		return get_tree().root.get_meta("selected_map_path")
+	return ""
 
 
 func _spawn_local_player() -> void:

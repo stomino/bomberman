@@ -8,6 +8,8 @@ var bombs: Array[Bomb] = []
 var explosions: Array[Explosion] = []
 var destructible_blocks: Array[DestructibleBlock] = []
 
+var _populate_from_balance_pattern: bool = true
+
 signal bomb_placed(grid_pos: Vector2i, owner_id: int)
 signal bomb_exploded(grid_pos: Vector2i, cells: Array)
 signal block_destroyed(grid_pos: Vector2i)
@@ -15,21 +17,32 @@ signal explosion_started(cells: Array)
 signal explosion_ended(cells: Array)
 
 
-func _init(map: GameMap, game_balance: GameBalance) -> void:
+func _init(map: GameMap, game_balance: GameBalance, populate_from_balance_pattern: bool = true) -> void:
+	"""populate_from_balance_pattern=false cuando el mapa viene de un
+	MapDefinition (editor): ahí los bloques destructibles ya están
+	pintados directamente en la grilla por el autor del mapa, así que no
+	hay que además superponerle el patrón centrado de GameBalance encima
+	(podría pintar sobre paredes que el usuario puso a propósito)."""
 	game_map = map
 	balance = game_balance
-	_initialize_destructible_blocks()
+	_populate_from_balance_pattern = populate_from_balance_pattern
+
+	if _populate_from_balance_pattern:
+		_initialize_destructible_blocks()
 
 
 func reset_round() -> void:
-	"""Limpia bombas/explosiones/bloques y vuelve a poblar el patrón de
-	destructibles. Asume que game_map.regenerate() ya se llamó antes (si
-	no, _initialize_destructible_blocks pisaría celdas que todavía tienen
-	bloques rotos de la ronda anterior)."""
+	"""Limpia bombas/explosiones/bloques. Asume que game_map.regenerate()
+	ya se llamó antes. Con mapa procedural, vuelve a poblar el patrón de
+	destructibles (regenerate() lo borró); con mapa custom, regenerate()
+	ya restauró los bloques del mapa tal como los pintó su autor, así que
+	no hay nada más que reponer acá."""
 	bombs.clear()
 	explosions.clear()
 	destructible_blocks.clear()
-	_initialize_destructible_blocks()
+
+	if _populate_from_balance_pattern:
+		_initialize_destructible_blocks()
 
 
 func _initialize_destructible_blocks() -> void:

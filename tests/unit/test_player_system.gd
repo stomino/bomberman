@@ -35,7 +35,7 @@ func _make_player(id: int, pos: Vector2i, _balance: GameBalance) -> Player:
 
 func test_player_moves_one_cell_after_ticks_for_speed() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(2, 2), balance)
@@ -55,7 +55,7 @@ func test_player_moves_one_cell_after_ticks_for_speed() -> void:
 
 func test_player_cannot_move_into_wall() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(1, 1), balance)  # esquina: arriba/izquierda son borde
@@ -69,7 +69,7 @@ func test_player_cannot_move_into_wall() -> void:
 
 func test_player_cannot_move_into_bomb_cell() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(2, 2), balance)
@@ -84,7 +84,7 @@ func test_player_cannot_move_into_bomb_cell() -> void:
 
 func test_player_dies_when_standing_in_explosion() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(3, 3), balance)
@@ -105,7 +105,7 @@ func test_player_dies_when_standing_in_explosion() -> void:
 
 func test_player_respawns_after_respawn_ticks() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(3, 3), balance)
@@ -130,7 +130,7 @@ func test_player_respawns_after_respawn_ticks() -> void:
 
 func test_effective_speed_increases_with_speed_stacks() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(2, 2), balance)
@@ -146,7 +146,7 @@ func test_effective_speed_increases_with_speed_stacks() -> void:
 func test_powerup_stacks_are_capped_at_max_stacks() -> void:
 	var balance := _make_balance()
 	balance.powerups.speed_max_stacks = 2
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(2, 2), balance)
@@ -160,7 +160,7 @@ func test_powerup_stacks_are_capped_at_max_stacks() -> void:
 
 func test_effective_bomb_range_and_max_bombs_increase_with_powerups() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(2, 2), balance)
@@ -178,7 +178,7 @@ func test_effective_bomb_range_and_max_bombs_increase_with_powerups() -> void:
 
 func test_shield_prevents_death_from_explosion() -> void:
 	var balance := _make_balance()
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(3, 3), balance)
@@ -200,7 +200,7 @@ func test_shield_prevents_death_from_explosion() -> void:
 func test_shield_expires_after_its_duration() -> void:
 	var balance := _make_balance()
 	balance.powerups.shield_duration_ticks = 2
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(3, 3), balance)
@@ -219,7 +219,7 @@ func test_shield_expires_after_its_duration() -> void:
 func test_respawn_grants_temporary_invulnerability() -> void:
 	var balance := _make_balance()
 	balance.spawn_invulnerability_ticks = 999
-	var map := GameMap.new(balance)
+	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
 	var player := _make_player(0, Vector2i(3, 3), balance)
