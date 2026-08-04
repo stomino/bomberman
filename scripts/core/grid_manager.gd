@@ -9,10 +9,6 @@ var tilemap_node: TileMapLayer
 
 func _ready() -> void:
 	_initialize_grid()
-	print("✅ GridManager inicializado con grilla de ", GRID_WIDTH, "x", GRID_HEIGHT)
-	if grid.size() > 0:
-		print("📊 Tamaño de grilla: ", grid.size(), " filas")
-		print("📊 Columnas en fila 0: ", grid[0].size())
 
 func _initialize_grid() -> void:
 	grid = []
@@ -20,7 +16,6 @@ func _initialize_grid() -> void:
 		grid.append([])
 		for x in range(GRID_WIDTH):
 			grid[y].append(0)
-	print("✅ Grilla inicializada con ", GRID_WIDTH * GRID_HEIGHT, " celdas transitables")
 
 func grid_to_world(grid_x: int, grid_y: int) -> Vector2:
 	return Vector2(grid_x * CELL_SIZE + CELL_SIZE / 2, grid_y * CELL_SIZE + CELL_SIZE / 2)
@@ -31,8 +26,9 @@ func world_to_grid(world_pos: Vector2) -> Vector2i:
 	return Vector2i(x, y)
 
 func is_walkable(grid_x: int, grid_y: int) -> bool:
-	# TEMPORAL: siempre transitable para pruebas
-	return true
+	if grid_x < 0 or grid_x >= GRID_WIDTH or grid_y < 0 or grid_y >= GRID_HEIGHT:
+		return false
+	return grid[grid_y][grid_x] == 0
 
 func get_spawn_position(spawn_index: int) -> Vector2i:
 	var spawns: Array[Vector2i] = [
