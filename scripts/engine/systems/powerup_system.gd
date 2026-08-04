@@ -28,7 +28,7 @@ func maybe_spawn_from_destroyed_block(pos: Vector2i) -> void:
 	var powerup := PowerUp.new(pos, type)
 	powerups.append(powerup)
 	powerup_spawned.emit(pos, type)
-	GameLogger.debug("PowerUp %s apareció en %s" % [str(type), str(pos)], "PowerUpSystem")
+	GameLogger.debug("PowerUp %s apareció en %s" % [PowerUp.type_to_string(type), str(pos)], "PowerUpSystem")
 
 
 func get_powerup_at(pos: Vector2i) -> PowerUp:

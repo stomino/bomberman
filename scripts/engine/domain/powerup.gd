@@ -25,3 +25,12 @@ static func type_from_key(key: String) -> Type:
 		"extra_bomb": return Type.EXTRA_BOMB
 		"shield": return Type.SHIELD
 		_: return Type.NONE
+
+
+static func type_to_string(type: Type) -> String:
+	match type:
+		Type.SPEED: return "SPEED"
+		Type.BOMB_RANGE: return "BOMB_RANGE"
+		Type.EXTRA_BOMB: return "EXTRA_BOMB"
+		Type.SHIELD: return "SHIELD"
+		_: return "NONE"

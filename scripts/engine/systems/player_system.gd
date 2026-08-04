@@ -153,17 +153,33 @@ func apply_powerup(player_id: int, type: PowerUp.Type) -> void:
 
 	match type:
 		PowerUp.Type.SPEED:
+			var before := get_effective_speed(player)
 			player.speed_powerup_stacks = mini(player.speed_powerup_stacks + 1, balance.powerups.speed_max_stacks)
+			GameLogger.debug("Jugador %d recogió SPEED: velocidad %.2f -> %.2f (stacks %d/%d)" % [
+				player_id, before, get_effective_speed(player),
+				player.speed_powerup_stacks, balance.powerups.speed_max_stacks
+			], "PlayerSystem")
 		PowerUp.Type.BOMB_RANGE:
+			var before := get_effective_bomb_range(player)
 			player.bomb_range_powerup_stacks = mini(player.bomb_range_powerup_stacks + 1, balance.powerups.bomb_range_max_stacks)
+			GameLogger.debug("Jugador %d recogió BOMB_RANGE: rango %d -> %d (stacks %d/%d)" % [
+				player_id, before, get_effective_bomb_range(player),
+				player.bomb_range_powerup_stacks, balance.powerups.bomb_range_max_stacks
+			], "PlayerSystem")
 		PowerUp.Type.EXTRA_BOMB:
+			var before := get_effective_max_bombs(player)
 			player.extra_bomb_powerup_stacks = mini(player.extra_bomb_powerup_stacks + 1, balance.powerups.extra_bomb_max_stacks)
+			GameLogger.debug("Jugador %d recogió EXTRA_BOMB: bombas máx %d -> %d (stacks %d/%d)" % [
+				player_id, before, get_effective_max_bombs(player),
+				player.extra_bomb_powerup_stacks, balance.powerups.extra_bomb_max_stacks
+			], "PlayerSystem")
 		PowerUp.Type.SHIELD:
 			player.shield_ticks_remaining = balance.powerups.shield_duration_ticks
+			GameLogger.debug("Jugador %d recogió SHIELD: activo por %d ticks" % [
+				player_id, player.shield_ticks_remaining
+			], "PlayerSystem")
 		_:
 			GameLogger.warning("Tipo de powerup desconocido: " + str(type), "PlayerSystem")
-
-	GameLogger.debug("Jugador %d recogió powerup tipo %s" % [player_id, str(type)], "PlayerSystem")
 
 
 func get_move_progress(player_id: int) -> float:
