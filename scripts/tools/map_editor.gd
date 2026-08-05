@@ -4,9 +4,16 @@ extends Node2D
 ## guardar/cargar como MapDefinition (maps/*.json). Herramienta de
 ## desarrollo — manipula datos de contenido, no gameplay.
 
-const DISPLAY_SCALE := 2.0
+const DEFAULT_ZOOM := 2.0
+const MIN_ZOOM := 0.5
+const MAX_ZOOM := 4.0
+const ZOOM_STEP := 0.25
+const PAN_SPEED := 500.0
+
 const DEFAULT_WIDTH := 13
 const DEFAULT_HEIGHT := 11
+const MIN_MAP_SIZE := 3
+const MAX_MAP_SIZE := 100
 
 const TOOL_SPAWN := 99  # sentinel: no es un valor de celda de GameMap
 
@@ -19,10 +26,15 @@ const SPAWN_COLOR := Color(0.2, 0.9, 0.3)
 var _definition: MapDefinition
 var _current_tool: int = GameMap.CELL_EMPTY
 
+var _zoom: float = DEFAULT_ZOOM
+var _pan_offset: Vector2 = Vector2.ZERO
+
 var _name_edit: LineEdit
 var _maps_option: OptionButton
 var _status_label: Label
 var _tool_buttons: Dictionary = {}
+var _width_spin: SpinBox
+var _height_spin: SpinBox
 
 var _content_container: VBoxContainer
 var _toggle_button: Button
@@ -32,6 +44,47 @@ var _panel_open: bool = true
 func _ready() -> void:
 	_definition = MapDefinition.create_empty(DEFAULT_WIDTH, DEFAULT_HEIGHT)
 	_build_ui()
+	_auto_fit()
+
+
+func _process(delta: float) -> void:
+	# Paneo con flechas — separado del zoom (rueda) y del pintado (click),
+	# no hace falta que el panel de herramientas tenga foco.
+	var pan_dir := Vector2.ZERO
+	if Input.is_key_pressed(KEY_LEFT):
+		pan_dir.x += 1
+	if Input.is_key_pressed(KEY_RIGHT):
+		pan_dir.x -= 1
+	if Input.is_key_pressed(KEY_UP):
+		pan_dir.y += 1
+	if Input.is_key_pressed(KEY_DOWN):
+		pan_dir.y -= 1
+
+	if pan_dir == Vector2.ZERO:
+		return
+
+	_pan_offset += pan_dir.normalized() * PAN_SPEED * delta
+	_apply_transform()
+
+
+func _apply_transform() -> void:
+	scale = Vector2(_zoom, _zoom)
+	position = _pan_offset
+
+
+func _auto_fit() -> void:
+	"""Encuadra el mapa completo en la ventana y resetea el paneo — se
+	llama después de crear/cargar/redimensionar, así nunca hace falta
+	salir a buscar el mapa a mano. Sin piso mínimo de zoom a propósito:
+	un mapa gigante debe verse completo aunque quede chiquito, en vez de
+	quedar cortado por un límite arbitrario."""
+	var viewport_size := get_viewport_rect().size
+	var map_pixel_size := Vector2(_definition.width, _definition.height) * _definition.cell_size
+	var fit_zoom := minf(viewport_size.x / map_pixel_size.x, viewport_size.y / map_pixel_size.y)
+
+	_zoom = minf(fit_zoom, DEFAULT_ZOOM)
+	_pan_offset = Vector2.ZERO
+	_apply_transform()
 	queue_redraw()
 
 
@@ -69,6 +122,29 @@ func _build_ui() -> void:
 	_name_edit.text = _definition.map_name
 	_name_edit.custom_minimum_size = Vector2(160, 0)
 	name_row.add_child(_name_edit)
+
+	var resize_row := HBoxContainer.new()
+	_content_container.add_child(resize_row)
+	var width_label := Label.new()
+	width_label.text = "Ancho:"
+	resize_row.add_child(width_label)
+	_width_spin = SpinBox.new()
+	_width_spin.min_value = MIN_MAP_SIZE
+	_width_spin.max_value = MAX_MAP_SIZE
+	_width_spin.value = _definition.width
+	resize_row.add_child(_width_spin)
+	var height_label := Label.new()
+	height_label.text = "Alto:"
+	resize_row.add_child(height_label)
+	_height_spin = SpinBox.new()
+	_height_spin.min_value = MIN_MAP_SIZE
+	_height_spin.max_value = MAX_MAP_SIZE
+	_height_spin.value = _definition.height
+	resize_row.add_child(_height_spin)
+	var resize_button := Button.new()
+	resize_button.text = "Redimensionar"
+	resize_button.pressed.connect(_on_resize_pressed)
+	resize_row.add_child(resize_button)
 
 	var actions_row := HBoxContainer.new()
 	_content_container.add_child(actions_row)
@@ -137,14 +213,27 @@ func _update_toggle_button() -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and event.keycode == KEY_TAB:
 		_on_toggle_panel_pressed()
-	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_paint_at_screen_position(event.position)
+	elif event is InputEventMouseButton and event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_paint_at_cursor()
+		elif event.button_index == MOUSE_BUTTON_WHEEL_UP:
+			_adjust_zoom(ZOOM_STEP)
+		elif event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+			_adjust_zoom(-ZOOM_STEP)
 
 
-func _paint_at_screen_position(screen_pos: Vector2) -> void:
-	var cell_screen_size := _definition.cell_size * DISPLAY_SCALE
-	var grid_x := int(screen_pos.x / cell_screen_size)
-	var grid_y := int(screen_pos.y / cell_screen_size)
+func _adjust_zoom(delta_zoom: float) -> void:
+	_zoom = clampf(_zoom + delta_zoom, MIN_ZOOM, MAX_ZOOM)
+	_apply_transform()
+
+
+func _paint_at_cursor() -> void:
+	# get_local_mouse_position() ya hace la conversión inversa del
+	# transform del propio nodo (paneo + zoom) — no hace falta recalcularla
+	# a mano como cuando el escalado era una constante fija en _draw().
+	var local_pos := get_local_mouse_position()
+	var grid_x := floori(local_pos.x / _definition.cell_size)
+	var grid_y := floori(local_pos.y / _definition.cell_size)
 
 	if grid_x < 0 or grid_x >= _definition.width or grid_y < 0 or grid_y >= _definition.height:
 		return
@@ -164,7 +253,7 @@ func _paint_at_screen_position(screen_pos: Vector2) -> void:
 
 
 func _draw() -> void:
-	var cs := _definition.cell_size * DISPLAY_SCALE
+	var cs := _definition.cell_size
 
 	for y in range(_definition.height):
 		for x in range(_definition.width):
@@ -211,15 +300,25 @@ func _on_load_pressed() -> void:
 
 	_definition = loaded
 	_name_edit.text = _definition.map_name
+	_width_spin.value = _definition.width
+	_height_spin.value = _definition.height
 	_status_label.text = "Cargado: " + file_name
-	queue_redraw()
+	_auto_fit()
 
 
 func _on_new_pressed() -> void:
 	_definition = MapDefinition.create_empty(DEFAULT_WIDTH, DEFAULT_HEIGHT)
 	_name_edit.text = _definition.map_name
+	_width_spin.value = _definition.width
+	_height_spin.value = _definition.height
 	_status_label.text = "Mapa nuevo"
-	queue_redraw()
+	_auto_fit()
+
+
+func _on_resize_pressed() -> void:
+	_definition.resize(int(_width_spin.value), int(_height_spin.value))
+	_status_label.text = "Redimensionado a %dx%d" % [_definition.width, _definition.height]
+	_auto_fit()
 
 
 func _refresh_maps_list() -> void:

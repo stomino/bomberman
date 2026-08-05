@@ -508,6 +508,58 @@ una captura de pantalla real después de unos frames, confirmando que el
 label aparece legible y bien posicionado arriba del jugador — se descartó
 el script después de verificar, no quedó en el repo.
 
+## Editor de mapas: redimensionar + scroll/zoom (pendientes de Fase 3.5)
+
+**Decisión — `MapDefinition.resize(new_width, new_height)`:** redimensiona
+anclado en (0,0) — agrega/saca columnas por la derecha y filas por
+abajo, nunca cambia el origen. El contenido existente se copia tal cual
+(sin distinguir "esto era borde automático" de "pared puesta a mano" —
+`MapDefinition` no guarda esa distinción); al final siempre se vuelve a
+estampar el borde indestructible sobre el nuevo perímetro, igual que
+`create_empty()`. Efecto secundario aceptado a propósito: si se agranda
+un mapa, el borde viejo queda como pared "suelta" en lo que ahora es
+interior — el autor del mapa ya tiene la herramienta "Borrar (Piso)"
+para limpiarlo en dos clics si no lo quiere; la alternativa (adivinar y
+auto-limpiar el borde viejo) es una heurística ambigua que no valía la
+complejidad para esta pasada. `spawn_positions` que queden fuera de los
+nuevos límites, o justo sobre el borde nuevo, se eliminan.
+
+**Decisión — `map_editor.gd`: cámara real en vez de escala fija.** Se
+reemplazó la constante `DISPLAY_SCALE` (matemática manual en `_draw()` y
+en la conversión click→celda) por el transform real del propio `Node2D`:
+`scale` para zoom (rueda del mouse, clamped 0.5x–4x), `position` para
+paneo (flechas del teclado). `_draw()` ahora dibuja en tamaño de celda
+real, sin escalar a mano. El pintado usa
+`Node2D.get_local_mouse_position()` en vez de convertir `event.position`
+a mano — Godot ya hace la conversión inversa del transform del nodo por
+nosotros, así que el pintado sigue siendo preciso sin importar el zoom o
+paneo actuales.
+
+Se agrega `_auto_fit()`: al crear/cargar/redimensionar un mapa, calcula
+el zoom que hace entrar el mapa completo en la ventana (sin piso mínimo
+— un mapa gigante debe verse completo, aunque quede chico, en vez de
+cortado por un límite arbitrario) y resetea el paneo — así nunca hace
+falta salir a buscar el mapa a mano después de una acción que cambia sus
+dimensiones.
+
+**Por qué:** los dos quedaron acoplados a propósito — redimensionar sin
+scroll/zoom dejaría zonas de un mapa grande invisibles e imposibles de
+pintar con el mouse.
+
+**Probado en vivo** (no solo por ausencia de errores): un script
+temporal fuera de headless redimensionó un mapa a 40x30, confirmó que
+`_auto_fit()` calculó el zoom correcto (0.675, acotado por la altura de
+la ventana) para que entrara completo, movió el cursor real (`warp_mouse`)
+a la posición de pantalla de una celda conocida, pintó, y verificó en
+`MapDefinition` que se modificó exactamente esa celda y ninguna vecina —
+confirma que la conversión pantalla→celda sigue siendo exacta después de
+cambiar el zoom. Se sacó una captura de pantalla real además de los
+prints. El script se descartó después, no quedó en el repo.
+
+**Fuera de esta pasada:** guardar mapas en `user://` (sigue sin hacer
+falta hasta exportar el juego), zoom anclado al cursor, redimensionar
+con un anclaje distinto a "arriba-izquierda fijo".
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

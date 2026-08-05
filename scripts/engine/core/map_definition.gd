@@ -64,6 +64,43 @@ func has_spawn_at(pos: Vector2i) -> bool:
 	return pos in spawn_positions
 
 
+func resize(new_width: int, new_height: int) -> void:
+	"""Redimensiona anclado en (0,0): agrega/saca columnas por la derecha
+	y filas por abajo. El contenido existente se copia tal cual — no se
+	intenta adivinar qué celdas de borde eran automáticas vs. paredes
+	puestas a propósito a mano, MapDefinition no guarda esa distinción.
+	El nuevo perímetro siempre queda indestructible, igual que
+	create_empty(). Los spawns que queden fuera de los nuevos límites, o
+	justo sobre el borde nuevo, se eliminan (mismo criterio que ya aplica
+	el editor al pintar una pared sobre un spawn existente)."""
+	var old_width := width
+	var old_height := height
+
+	var new_cells: Array = []
+	for y in range(new_height):
+		var row: Array[int] = []
+		for x in range(new_width):
+			row.append(get_cell(x, y) if x < old_width and y < old_height else GameMap.CELL_EMPTY)
+		new_cells.append(row)
+
+	width = new_width
+	height = new_height
+	cells = new_cells
+
+	for y in range(height):
+		for x in range(width):
+			if x == 0 or x == width - 1 or y == 0 or y == height - 1:
+				set_cell(x, y, GameMap.CELL_INDESTRUCTIBLE)
+
+	var kept_spawns: Array[Vector2i] = []
+	for pos in spawn_positions:
+		var in_bounds := pos.x >= 0 and pos.x < width and pos.y >= 0 and pos.y < height
+		var on_border := pos.x == 0 or pos.x == width - 1 or pos.y == 0 or pos.y == height - 1
+		if in_bounds and not on_border:
+			kept_spawns.append(pos)
+	spawn_positions = kept_spawns
+
+
 # ============================================
 # CARGA/GUARDADO (Infrastructure: única frontera con Godot en esta clase)
 # ============================================

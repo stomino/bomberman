@@ -181,7 +181,7 @@ desde el inicio.
 | 1 | Movimiento, colisiones, grilla | ✅ Hecho |
 | 2 | Bombas, explosiones, bloques destructibles | ✅ Hecho |
 | 3 | PowerUps, reglas completas, sistema de rondas | ✅ Hecho |
-| 3.5 | Editor de mapas | ✅ Primera versión (pintar/guardar/cargar/jugar) |
+| 3.5 | Editor de mapas | ✅ Hecho (pintar/guardar/cargar/jugar + redimensionar + scroll/zoom). Pendiente real: guardar en `user://` (recién hace falta al exportar) |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Hecho (ENet real sobre loopback, N jugadores conectados y renderizados por cliente) |
 | 5 | Multiplayer LAN | ⚠️ Código listo (el servidor ya escucha en todas las interfaces, no solo loopback; muestra su IP de LAN en pantalla) — falta probarlo con una segunda PC física en la misma red |
 | 6 | Servidor dedicado, juego por Internet | Pendiente |
