@@ -443,6 +443,43 @@ también la primera vez que la lógica de fin de ronda
 (`GameManager._check_round_end`, gateada en `players.size() >= 2`) corrió
 de verdad sobre una partida en red — funcionó sin cambios.
 
+## Fase 5: LAN — sin cambios de protocolo, solo mostrar la IP
+
+**Decisión:** no hizo falta tocar el protocolo de red para pasar de
+loopback a LAN. `ENetMultiplayerPeer.create_server(DEFAULT_PORT, ...)`
+(`ServerRoot._start_server()`) ya escucha en todas las interfaces de la
+máquina, no solo `127.0.0.1` — eso ya lo daba Fase 4 sin saberlo. Lo
+único que faltaba era una forma de que quien hostea supiera qué IP
+pasarle al otro jugador sin ir a buscarla a mano (`ipconfig`/Ajustes de
+red):
+
+- `ServerRoot._get_lan_ip()`: filtra `IP.get_local_addresses()`
+  descartando IPv6 y loopback, prioriza rangos privados típicos
+  (`192.168.*`, `10.*`, `172.16-31.*`); si no encuentra ninguno, devuelve
+  la primera IPv4 no-loopback como mejor esfuerzo.
+- `ServerRoot` ahora arma un `CanvasLayer`/`Label` mínimo
+  (`_build_status_ui()`) mostrando `IP:puerto` y `jugadores conectados/
+  máximo`, actualizado en conexión/desconexión — el servidor no tenía
+  ningún nodo de Presentation antes (Fase 4 original: "no dibuja nada"),
+  pero para host manual en LAN hace falta poder leer el dato en pantalla,
+  no solo en el log (que además está apagado por defecto).
+
+**Probado:** servidor + cliente conectando por la IP de LAN real de la
+máquina (`192.168.x.x`, no `127.0.0.1`) en vez de loopback — conecta sin
+errores. Esto valida el camino de red no-loopback, pero **no reemplaza
+una prueba real con una segunda PC física en la misma red** — eso quedó
+pendiente de que el dueño del proyecto lo pruebe (yo no tengo forma de
+manejar dos máquinas físicas).
+
+**Fuera de alcance:** abrir el puerto en el Firewall de Windows es una
+configuración del sistema operativo del usuario — no es algo que se
+automatice desde el código ni algo que un asistente deba tocar por su
+cuenta; si la conexión falla entre dos PCs reales, es el primer lugar
+para mirar. IPv6 se descarta a propósito en `_get_lan_ip()` (no en el
+transporte en sí) para no complicar el primer host manual con múltiples
+IPs candidatas — ENet igual podría funcionar sobre IPv6 si se le pasa
+esa dirección a mano.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

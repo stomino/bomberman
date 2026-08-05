@@ -183,7 +183,7 @@ desde el inicio.
 | 3 | PowerUps, reglas completas, sistema de rondas | ✅ Hecho |
 | 3.5 | Editor de mapas | ✅ Primera versión (pintar/guardar/cargar/jugar) |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Hecho (ENet real sobre loopback, N jugadores conectados y renderizados por cliente) |
-| 5 | Multiplayer LAN | Pendiente |
+| 5 | Multiplayer LAN | ⚠️ Código listo (el servidor ya escucha en todas las interfaces, no solo loopback; muestra su IP de LAN en pantalla) — falta probarlo con una segunda PC física en la misma red |
 | 6 | Servidor dedicado, juego por Internet | Pendiente |
 | 7 | Matchmaking, ranking, colas competitivas | Pendiente |
 | 8 | Bots, IA | Pendiente |

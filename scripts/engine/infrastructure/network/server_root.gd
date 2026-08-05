@@ -18,6 +18,7 @@ var game_manager: GameManager
 
 var _map_is_custom: bool = false
 var _next_spawn_index: int = 0
+var _status_label: Label
 
 
 func _ready() -> void:
@@ -29,6 +30,7 @@ func _ready() -> void:
 	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system, balance)
 
 	_connect_bomb_signals()
+	_build_status_ui()
 	_start_server()
 	game_manager.start_match()
 
@@ -70,6 +72,10 @@ func _connect_bomb_signals() -> void:
 
 func _start_server() -> void:
 	var peer := ENetMultiplayerPeer.new()
+	# create_server() sin bind_address escucha en todas las interfaces de
+	# red de la máquina (no solo loopback) — es lo que ya permite Fase 5
+	# (LAN) sin cambiar el protocolo, ver
+	# docs/architecture/Implementation_Decisions.md.
 	var error := peer.create_server(DEFAULT_PORT, balance.max_players)
 	if error != OK:
 		push_error("[ServerRoot] No se pudo iniciar el servidor en el puerto %d (error %d)" % [DEFAULT_PORT, error])
@@ -78,7 +84,10 @@ func _start_server() -> void:
 	multiplayer.multiplayer_peer = peer
 	multiplayer.peer_connected.connect(_on_peer_connected)
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
-	GameLogger.info("Servidor escuchando en el puerto %d" % DEFAULT_PORT, "ServerRoot")
+
+	var lan_ip := _get_lan_ip()
+	GameLogger.info("Servidor escuchando en %s:%d" % [lan_ip, DEFAULT_PORT], "ServerRoot")
+	_update_status_ui()
 
 
 func _on_peer_connected(id: int) -> void:
@@ -94,6 +103,7 @@ func _on_peer_connected(id: int) -> void:
 
 	player_system.add_player(player)
 	GameLogger.info("Jugador %d conectado, spawn en %s" % [id, str(player.grid_position)], "ServerRoot")
+	_update_status_ui()
 
 
 func _on_peer_disconnected(id: int) -> void:
@@ -101,6 +111,58 @@ func _on_peer_disconnected(id: int) -> void:
 	# ver docs/architecture/Implementation_Decisions.md).
 	player_system.remove_player(id)
 	GameLogger.info("Jugador %d desconectado" % id, "ServerRoot")
+	_update_status_ui()
+
+
+func _get_lan_ip() -> String:
+	"""Mejor esfuerzo para mostrarle al que hostea qué IP pasarle al otro
+	jugador — sin esto, tendría que buscarla a mano (ipconfig / Ajustes de
+	red). Prioriza IPv4 de rango privado típico de LAN casera/de oficina;
+	si no encuentra ninguna, devuelve la primera IPv4 no-loopback que
+	haya (mejor un dato aproximado que nada)."""
+	var candidates: Array[String] = []
+
+	for address in IP.get_local_addresses():
+		if ":" in address or address.begins_with("127."):
+			continue
+		candidates.append(address)
+
+	for address in candidates:
+		if address.begins_with("192.168.") or address.begins_with("10."):
+			return address
+
+	for address in candidates:
+		var second_octet := address.get_slice(".", 1).to_int()
+		if address.begins_with("172.") and second_octet >= 16 and second_octet <= 31:
+			return address
+
+	return candidates[0] if not candidates.is_empty() else "127.0.0.1"
+
+
+func _build_status_ui() -> void:
+	"""El servidor no tenía ningún nodo de Presentation (Fase 4 original:
+	'no dibuja nada'). Para Fase 5 (LAN) hace falta que quien hostea pueda
+	leer la IP:puerto sin ir a buscar la consola — un Label mínimo alcanza,
+	no amerita más que eso."""
+	var ui_layer := CanvasLayer.new()
+	add_child(ui_layer)
+
+	_status_label = Label.new()
+	_status_label.position = Vector2(16, 16)
+	_status_label.add_theme_font_size_override("font_size", 20)
+	ui_layer.add_child(_status_label)
+
+	_update_status_ui()
+
+
+func _update_status_ui() -> void:
+	if not _status_label:
+		return
+
+	var lan_ip := _get_lan_ip()
+	_status_label.text = "Servidor: %s:%d\nJugadores: %d/%d" % [
+		lan_ip, DEFAULT_PORT, player_system.players.size(), balance.max_players
+	]
 
 
 func _broadcast_snapshot() -> void:
