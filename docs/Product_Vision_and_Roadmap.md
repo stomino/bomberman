@@ -182,7 +182,7 @@ desde el inicio.
 | 2 | Bombas, explosiones, bloques destructibles | ✅ Hecho |
 | 3 | PowerUps, reglas completas, sistema de rondas | ✅ Hecho |
 | 3.5 | Editor de mapas | ✅ Primera versión (pintar/guardar/cargar/jugar) |
-| 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Primera versión (1 jugador vía ENet real sobre loopback; 2+ jugadores queda para la siguiente iteración) |
+| 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Hecho (ENet real sobre loopback, N jugadores conectados y renderizados por cliente) |
 | 5 | Multiplayer LAN | Pendiente |
 | 6 | Servidor dedicado, juego por Internet | Pendiente |
 | 7 | Matchmaking, ranking, colas competitivas | Pendiente |

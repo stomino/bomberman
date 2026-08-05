@@ -87,7 +87,7 @@ func _connect_bomb_signals() -> void:
 func _inject_into_player_node() -> void:
 	var player_node := get_node_or_null("../Player")
 	if player_node and player_node.has_method("set_game_root"):
-		player_node.set_game_root(self)
+		player_node.set_game_root(self, LOCAL_PLAYER_ID)
 	else:
 		push_error("[GameRoot] No se encontró el nodo 'Player' hermano para inyectar dependencias.")
 
@@ -116,34 +116,34 @@ func try_place_bomb() -> void:
 	game_manager.queue_command(PlaceBombCommand.new(LOCAL_PLAYER_ID))
 
 
-func is_player_alive() -> bool:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
+func is_player_alive(player_id: int) -> bool:
+	var player := player_system.get_player(player_id)
 	return player != null and player.alive
 
 
-func get_player_render_position() -> Vector2:
-	return player_system.get_position_for_render(LOCAL_PLAYER_ID, game_map.cell_size)
+func get_player_render_position(player_id: int) -> Vector2:
+	return player_system.get_position_for_render(player_id, game_map.cell_size)
 
 
-func is_player_moving() -> bool:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
+func is_player_moving(player_id: int) -> bool:
+	var player := player_system.get_player(player_id)
 	return player != null and player.is_moving
 
 
-func get_player_facing_direction() -> Vector2i:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
+func get_player_facing_direction(player_id: int) -> Vector2i:
+	var player := player_system.get_player(player_id)
 	return player.facing_direction if player != null else Vector2i.DOWN
 
 
-func get_player_speed() -> float:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
+func get_player_speed(player_id: int) -> float:
+	var player := player_system.get_player(player_id)
 	return player_system.get_effective_speed(player) if player != null else 0.0
 
 
-func is_player_shielded() -> bool:
-	var player := player_system.get_player(LOCAL_PLAYER_ID)
+func is_player_shielded(player_id: int) -> bool:
+	var player := player_system.get_player(player_id)
 	return player != null and player_system.is_shielded(player)
 
 
-func get_player_move_progress() -> float:
-	return player_system.get_move_progress(LOCAL_PLAYER_ID)
+func get_player_move_progress(player_id: int) -> float:
+	return player_system.get_move_progress(player_id)

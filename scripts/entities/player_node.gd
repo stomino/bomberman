@@ -4,6 +4,8 @@ extends CharacterBody2D
 ## No contiene lógica de gameplay (Golden Rule 4: Presentation never changes gameplay).
 
 var game_root: GameRoot
+var player_id: int
+var is_local: bool = false
 
 @onready var anim_sprite: AnimatedSprite2D = $AnimatedSprite2D
 
@@ -13,41 +15,44 @@ var _blocked_anim_progress: float = 0.0
 const SHIELD_TINT := Color(0.6, 0.8, 1.0)
 
 
-func set_game_root(root: GameRoot) -> void:
+func set_game_root(root: GameRoot, id: int) -> void:
 	game_root = root
+	player_id = id
+	is_local = player_id == root.LOCAL_PLAYER_ID
 
 
 func _physics_process(delta: float) -> void:
 	if not game_root:
 		return
 
-	visible = game_root.is_player_alive()
+	visible = game_root.is_player_alive(player_id)
 	if not visible:
 		return
 
-	modulate = SHIELD_TINT if game_root.is_player_shielded() else Color.WHITE
+	modulate = SHIELD_TINT if game_root.is_player_shielded(player_id) else Color.WHITE
 
-	_handle_movement_input()
+	if is_local:
+		_handle_movement_input()
 
-	var target_render_pos := game_root.get_player_render_position()
-	var moving := game_root.is_player_moving()
+	var target_render_pos := game_root.get_player_render_position(player_id)
+	var moving := game_root.is_player_moving(player_id)
 
 	if moving:
 		position = position.lerp(target_render_pos, 0.5)
 	else:
 		position = target_render_pos
 
-	var facing := game_root.get_player_facing_direction()
+	var facing := game_root.get_player_facing_direction(player_id)
 
 	if moving:
 		# Movimiento real: la animación sigue el progreso real de la celda.
 		_blocked_anim_progress = 0.0
-		_update_animation(true, facing, game_root.get_player_move_progress())
+		_update_animation(true, facing, game_root.get_player_move_progress(player_id))
 	elif _holding_direction:
 		# Bloqueado contra algo pero con input activo: sigue "caminando"
 		# en el lugar, con su propio ciclo de tiempo, para que el jugador
 		# pueda girar libremente sin que la posición se mueva.
-		_blocked_anim_progress = fmod(_blocked_anim_progress + game_root.get_player_speed() * delta, 1.0)
+		_blocked_anim_progress = fmod(_blocked_anim_progress + game_root.get_player_speed(player_id) * delta, 1.0)
 		_update_animation(true, facing, _blocked_anim_progress)
 	else:
 		_update_animation(false, facing, 0.0)
@@ -73,6 +78,8 @@ func _handle_movement_input() -> void:
 
 
 func _input(event: InputEvent) -> void:
+	if not is_local:
+		return
 	if event.is_action_pressed("place_bomb"):
 		game_root.try_place_bomb()
 

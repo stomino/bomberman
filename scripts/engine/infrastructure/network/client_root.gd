@@ -11,8 +11,11 @@ extends GameRoot
 ## todo, cómo viaja el input y que nunca se corre game_manager.tick() acá
 ## (el cliente nunca es autoritativo).
 
+const PLAYER_SCENE := preload("res://scenes/player.tscn")
+
 var _last_sent_direction: Vector2i = Vector2i.ZERO
 var _has_sent_direction: bool = false
+var _player_nodes: Dictionary = {}  # player_id -> Node, ver _sync_player_nodes()
 
 
 func _ready() -> void:
@@ -28,7 +31,10 @@ func _ready() -> void:
 	powerup_system = PowerUpSystem.new(balance)
 	game_manager = GameManager.new(game_map, player_system, bomb_system, powerup_system, balance)
 
-	_inject_into_player_node()
+	# A diferencia de GameRoot (sandbox, 1 Player estático en la escena),
+	# acá no se sabe de antemano cuántos jugadores va a haber ni quién es
+	# "el mío" hasta conectarse — los nodos Player se spawnean en runtime,
+	# ver _sync_player_nodes().
 	_inject_into_game_renderer()
 	_connect_to_server()
 
@@ -39,18 +45,31 @@ func _physics_process(_delta: float) -> void:
 	pass
 
 
-func _inject_into_player_node() -> void:
-	"""Sobreescribe la versión de GameRoot: ahí GameRoot es HERMANO de
-	Player/GameRenderer ("../Player"); acá ClientRoot vive en la raíz de
-	la escena (scenes/client.tscn) para que su NodePath (/root/Match)
-	coincida con el de ServerRoot en scenes/server.tscn — condición que
-	pide Godot para rutear RPCs entre dos escenas distintas. Eso hace que
-	Player/GameRenderer sean HIJOS directos, no hermanos."""
-	var player_node := get_node_or_null("Player")
-	if player_node and player_node.has_method("set_game_root"):
-		player_node.set_game_root(self)
-	else:
-		push_error("[ClientRoot] No se encontró el nodo hijo 'Player' para inyectar dependencias.")
+func _sync_player_nodes() -> void:
+	"""Instancia/destruye nodos Player para que coincidan exactamente con
+	los jugadores presentes en el último snapshot — cubre tanto al
+	jugador local como a los rivales, con el mismo mecanismo."""
+	var current_ids := player_system.players.keys()
+
+	for id in current_ids:
+		if not _player_nodes.has(id):
+			_spawn_player_node(id)
+
+	for id in _player_nodes.keys():
+		if id not in current_ids:
+			_despawn_player_node(id)
+
+
+func _spawn_player_node(id: int) -> void:
+	var node := PLAYER_SCENE.instantiate()
+	add_child(node)
+	node.set_game_root(self, id)
+	_player_nodes[id] = node
+
+
+func _despawn_player_node(id: int) -> void:
+	_player_nodes[id].queue_free()
+	_player_nodes.erase(id)
 
 
 func _inject_into_game_renderer() -> void:
@@ -119,6 +138,7 @@ func try_place_bomb() -> void:
 @rpc("authority", "call_remote", "reliable")
 func receive_snapshot(data: Dictionary) -> void:
 	SnapshotCodec.apply(data, game_manager.state, player_system, bomb_system, powerup_system, game_map)
+	_sync_player_nodes()
 
 
 # ============================================

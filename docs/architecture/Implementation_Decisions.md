@@ -394,6 +394,55 @@ siguen en `false` — no hacen falta con latencia ~0 en loopback),
 delta-compression / snapshot rate configurable (optimización, Fase 10),
 reconexión, espectador, y servidor dedicado headless empaquetado (Fase 6).
 
+## Fase 4, iteración 2: `scenes/player.tscn` + spawn dinámico de rivales
+
+**Decisión:** se extrajo `scenes/player.tscn` (CharacterBody2D +
+`player_node.gd` + CollisionShape2D + AnimatedSprite2D, con todos los
+`AtlasTexture` del spritesheet) como escena reutilizable — antes ese
+árbol estaba duplicado inline en `scenes/main.tscn` y `scenes/client.tscn`.
+`main.tscn` ahora instancia `player.tscn` para su único jugador estático
+del sandbox (sin cambio de comportamiento). `client.tscn` perdió el nodo
+Player por completo: `ClientRoot` instancia `player.tscn` en runtime, una
+vez por cada `player_id` presente en el snapshot recibido
+(`_sync_player_nodes()`, llamado desde `receive_snapshot()`), y destruye
+(`queue_free()`) los nodos de jugadores que ya no están en el snapshot
+(cubre tanto la muerte/respawn normal — que no saca al jugador de
+`player_system.players` — como una desconexión real).
+
+`player_node.gd` pasó de operar implícitamente sobre "el" jugador a
+recibir su propio `player_id` en `set_game_root(root, player_id)`, y
+calcula `is_local := player_id == root.LOCAL_PLAYER_ID` una sola vez al
+spawnear. Los 7 getters de lectura de `GameRoot`
+(`is_player_alive`, `get_player_render_position`, etc.) pasaron a recibir
+`player_id` como parámetro en vez de usar `LOCAL_PLAYER_ID` implícito —
+ya delegaban en `player_system.get_player(player_id)`, así que fue
+mecánico. Los 3 métodos de input (`set_player_move_direction`,
+`clear_player_input`, `try_place_bomb`) **no cambiaron de firma**: siguen
+siendo siempre "el jugador local", porque el teclado de una instancia de
+Godot solo puede representar a un humano — `player_node.gd` los llama
+únicamente si `is_local` es true, así el nodo de un rival es puramente
+visual y nunca genera input.
+
+**Por qué:** `ServerRoot` ya soportaba N jugadores desde la Fase 4
+original (`_broadcast_snapshot()` ya mandaba a cada peer el snapshot
+completo con todos los jugadores) — lo único que faltaba era que
+`ClientRoot` supiera mostrar más de uno. Reusar `player_node.gd` tal
+cual (con el agregado de `player_id`/`is_local`) para representar tanto
+al jugador propio como a los rivales evita un tipo de nodo nuevo
+"jugador remoto" — es el mismo componente, la única diferencia real es
+si escucha teclado o no.
+
+**Probado en vivo:** servidor + 2 clientes reales sobre loopback,
+verificado con logs temporales (sacados después de confirmar) — ambos
+clientes terminaron con `player_system.players.size() == 2` y 2 nodos
+Player spawneados, sin errores de RPC. Cuando uno de los dos procesos
+cliente se cerró, el otro despawneó correctamente el nodo del rival
+desconectado — confirma que `_sync_player_nodes()` también resuelve el
+camino de baja, no solo el de alta. Como efecto colateral, esta fue
+también la primera vez que la lógica de fin de ronda
+(`GameManager._check_round_end`, gateada en `players.size() >= 2`) corrió
+de verdad sobre una partida en red — funcionó sin cambios.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`
