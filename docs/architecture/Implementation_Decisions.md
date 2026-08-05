@@ -560,6 +560,69 @@ prints. El script se descartó después, no quedó en el repo.
 falta hasta exportar el juego), zoom anclado al cursor, redimensionar
 con un anclaje distinto a "arriba-izquierda fijo".
 
+## Tope de 30x30 en mapas + zoom ajustable en el juego real (no solo el editor)
+
+**El problema real:** el auto-fit del editor (entrada anterior) solo
+resolvía la herramienta de diseño. El juego jugable (`GameRoot`/
+`main.tscn` para Sandbox, `ClientRoot`/`client.tscn` para el cliente de
+red) seguía con una escala **fija** de 2x — funcionaba con el mapa
+default (13x11) pero no entraba en la ventana con cualquier mapa más
+grande hecho en el editor. Confirmado por el dueño del producto jugando:
+"los mapas no entran en la ventana que se abre con F5".
+
+**Decisión — tope de tamaño:** `MAX_MAP_SIZE` en `map_editor.gd` baja de
+100 a 30. Los mapas del juego nunca superan 30x30.
+
+**Decisión — `GameRoot` pasa a `extends Node2D` (era `extends Node`):**
+para poder aplicar un zoom calculado con `self.scale` directo (sin
+casteos `as Node2D` ni tocar el padre), `GameRoot` necesita ser él mismo
+el nodo con transform — el mismo rol que `ClientRoot` ya cumplía en
+`client.tscn` desde la iteración de "2+ jugadores". Esto obligó a
+fusionar, en `main.tscn`, el nodo "Main" (Node2D, tenía la escala fija) y
+el nodo "GameRoot" (Node, tenía el script) en uno solo; "GameRenderer"/
+"Player" pasan a ser hijos directos de esa raíz en vez de hermanos —
+misma forma que ya tiene `client.tscn`. Como consecuencia,
+`_inject_into_player_node()`/`_inject_into_game_renderer()` en
+`GameRoot` pasan de buscar `"../Player"`/`"../GameRenderer"` a
+`"Player"`/`"GameRenderer"` (hijos directos) — y los overrides que
+`ClientRoot` tenía de esos dos métodos quedaron **idénticos** a la base
+una vez actualizada, así que se eliminaron de `client_root.gd` (menos
+código duplicado, mismo comportamiento).
+
+**Decisión — `GameRoot._apply_map_zoom()`:** calcula
+`min(viewport.x / mapa_px.x, viewport.y / mapa_px.y)`, con tope superior
+en `2.0` (la escala "de diseño" original, para que un mapa chico no se
+vea artificialmente gigante) y **sin piso mínimo** — un mapa de 30x30
+siempre debe entrar completo, aunque los sprites se vean más chicos que
+hoy; el dueño del producto ya eligió este criterio sabiendo el
+trade-off, en vez de la alternativa (cámara que sigue al jugador, más
+fiel a los propios ejemplos del documento de producto — Valorant/LoL/
+CS/Rocket League — pero mucho más trabajo). Se llama desde
+`GameRoot._ready()` (sandbox, dimensiones conocidas de entrada) y desde
+`ClientRoot.receive_snapshot()` (el cliente no conoce el tamaño del mapa
+hasta el primer snapshot del servidor), con un guard
+(`_last_zoomed_width/height`) para no reasignar `scale` en cada
+snapshot si el mapa no cambió de tamaño.
+
+`game_renderer.gd`/`player_node.gd` no cambiaron: ya dibujan/posicionan
+en tamaño de celda real, el zoom vive enteramente en el transform del
+nodo raíz.
+
+**Probado:** Sandbox real (no headless) con un mapa de 30x30 (scale
+resultante 0.675, acotado por el alto de la ventana) y uno de 8x8 (scale
+2.0, tope superior funcionando) — capturas de pantalla confirmando que
+ambos entran bien. Servidor+cliente reales sobre loopback con un mapa de
+25x25 vía `GameBalance` — sin errores, `_apply_map_zoom()` corrió una
+sola vez pese a cientos de snapshots (el guard funciona). Nota honesta:
+el valor de zoom que logueó el cliente en esa prueba (corrida
+`--headless`, sin ventana real) no coincidió con el cálculo esperado —
+`get_viewport_rect().size` no reporta lo mismo sin una ventana real que
+con una. No es un bug del código: ningún jugador real corre el cliente
+headless (necesita ver la pantalla por definición), y la prueba en
+Sandbox con ventana real sí dio los valores exactos esperados en los dos
+casos. Se deja documentado por si en el futuro se automatizan tests de
+red headless que dependan de este cálculo.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

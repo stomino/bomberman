@@ -6,12 +6,10 @@
 
 [node name="Main" type="Node2D" unique_id=1068630147]
 scale = Vector2(2, 2)
+script = ExtResource("1_o5qli")
 
 [node name="GameRenderer" type="Node2D" parent="." unique_id=1796848460]
 script = ExtResource("4_gmrnd")
-
-[node name="GameRoot" type="Node" parent="." unique_id=600012035]
-script = ExtResource("1_o5qli")
 
 [node name="Player" parent="." unique_id=1452730937 instance=ExtResource("5_player")]
 position = Vector2(32, 32)

@@ -72,14 +72,6 @@ func _despawn_player_node(id: int) -> void:
 	_player_nodes.erase(id)
 
 
-func _inject_into_game_renderer() -> void:
-	var renderer := get_node_or_null("GameRenderer")
-	if renderer and renderer.has_method("set_game_root"):
-		renderer.set_game_root(self)
-	else:
-		push_error("[ClientRoot] No se encontró el nodo hijo 'GameRenderer' para inyectar dependencias.")
-
-
 func _connect_to_server() -> void:
 	var ip := _selected_server_ip()
 	var peer := ENetMultiplayerPeer.new()
@@ -138,6 +130,7 @@ func try_place_bomb() -> void:
 @rpc("authority", "call_remote", "reliable")
 func receive_snapshot(data: Dictionary) -> void:
 	SnapshotCodec.apply(data, game_manager.state, player_system, bomb_system, powerup_system, game_map)
+	_apply_map_zoom()
 	_sync_player_nodes()
 
 

@@ -1,8 +1,12 @@
 class_name GameRoot
-extends Node
+extends Node2D
 
 ## Composition root: único lugar donde se crean e inyectan las dependencias
-## de gameplay (Golden Rule 8: "Dependencies are injected").
+## de gameplay (Golden Rule 8: "Dependencies are injected"). Extiende
+## Node2D (no Node) porque es también la raíz visual de su escena — trae
+## un transform propio (scale) para poder ajustar el zoom al tamaño del
+## mapa cargado, ver _apply_map_zoom(). GameRenderer/Player cuelgan de
+## acá como hijos directos, no como hermanos.
 
 var balance: GameBalance
 var game_map: GameMap
@@ -18,6 +22,8 @@ var game_manager: GameManager
 var LOCAL_PLAYER_ID := 0
 
 var _map_is_custom: bool = false
+var _last_zoomed_width: int = -1
+var _last_zoomed_height: int = -1
 
 
 func _ready() -> void:
@@ -32,6 +38,7 @@ func _ready() -> void:
 	_connect_bomb_signals()
 	_inject_into_player_node()
 	_inject_into_game_renderer()
+	_apply_map_zoom()
 	game_manager.start_match()
 
 
@@ -85,19 +92,41 @@ func _connect_bomb_signals() -> void:
 
 
 func _inject_into_player_node() -> void:
-	var player_node := get_node_or_null("../Player")
+	var player_node := get_node_or_null("Player")
 	if player_node and player_node.has_method("set_game_root"):
 		player_node.set_game_root(self, LOCAL_PLAYER_ID)
 	else:
-		push_error("[GameRoot] No se encontró el nodo 'Player' hermano para inyectar dependencias.")
+		push_error("[GameRoot] No se encontró el nodo hijo 'Player' para inyectar dependencias.")
 
 
 func _inject_into_game_renderer() -> void:
-	var renderer := get_node_or_null("../GameRenderer")
+	var renderer := get_node_or_null("GameRenderer")
 	if renderer and renderer.has_method("set_game_root"):
 		renderer.set_game_root(self)
 	else:
-		push_error("[GameRoot] No se encontró el nodo 'GameRenderer' hermano para inyectar dependencias.")
+		push_error("[GameRoot] No se encontró el nodo hijo 'GameRenderer' para inyectar dependencias.")
+
+
+func _apply_map_zoom() -> void:
+	"""Ajusta la escala de toda la escena (Golden Rule: el zoom vive en el
+	transform del nodo raíz, GameRenderer/Player no necesitan saber que
+	existe) para que el mapa completo entre en la ventana, sin importar su
+	tamaño (hasta 30x30, tope que impone el editor). Con guard para no
+	reasignar scale en cada llamada si el mapa no cambió de tamaño — en
+	ClientRoot esto se llama en cada snapshot."""
+	if game_map.width <= 0 or game_map.height <= 0:
+		return
+	if game_map.width == _last_zoomed_width and game_map.height == _last_zoomed_height:
+		return
+
+	var viewport_size := get_viewport_rect().size
+	var map_pixel_size := Vector2(game_map.width, game_map.height) * game_map.cell_size
+	var fit_zoom := minf(viewport_size.x / map_pixel_size.x, viewport_size.y / map_pixel_size.y)
+	var zoom := minf(fit_zoom, 2.0)
+
+	scale = Vector2(zoom, zoom)
+	_last_zoomed_width = game_map.width
+	_last_zoomed_height = game_map.height
 
 
 # ============================================

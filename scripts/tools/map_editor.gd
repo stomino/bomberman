@@ -13,7 +13,7 @@ const PAN_SPEED := 500.0
 const DEFAULT_WIDTH := 13
 const DEFAULT_HEIGHT := 11
 const MIN_MAP_SIZE := 3
-const MAX_MAP_SIZE := 100
+const MAX_MAP_SIZE := 30
 
 const TOOL_SPAWN := 99  # sentinel: no es un valor de celda de GameMap
 
