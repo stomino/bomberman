@@ -23,6 +23,7 @@ func _make_balance() -> GameBalance:
 	balance.explosion_duration_base_ticks = 2
 	balance.explosion_duration_min_ticks = 1
 	balance.explosion_duration_max_ticks = 10
+	balance.abilities.speed_ability_bonus = 0.0  # tests de movimiento no deberían depender del default de AbilityBalance
 	return balance
 
 
@@ -240,3 +241,96 @@ func test_respawn_grants_temporary_invulnerability() -> void:
 
 	assert_true(player.alive)
 	assert_true(system.is_shielded(player), "debería tener invulnerabilidad de spawn recién respawneado")
+
+
+func test_dash_moves_two_cells_when_unlocked_and_path_clear() -> void:
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	player.dash_unlocked = true
+	system.add_player(player)
+	var state := GameState.new()
+
+	assert_true(system.try_dash(0), "el dash debería activarse con el camino libre y ya desbloqueado")
+
+	for i in range(10):  # misma duración que un paso normal, ver _make_balance
+		system.tick(state)
+
+	assert_eq(player.grid_position, Vector2i(4, 2), "el dash debería cubrir 2 celdas, no 1")
+
+
+func test_dash_fails_when_not_unlocked() -> void:
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_false(system.try_dash(0), "no debería poder dashear antes de desbloquearlo")
+	assert_false(player.is_moving)
+	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_dash_respects_collision_on_intermediate_cell() -> void:
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	map.set_cell(3, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda intermedia bloqueada
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	player.dash_unlocked = true
+	system.add_player(player)
+
+	assert_false(system.try_dash(0), "no debería dashear si la celda intermedia está bloqueada")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_dash_respects_collision_on_destination_cell() -> void:
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	map.set_cell(4, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda destino bloqueada
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	player.dash_unlocked = true
+	system.add_player(player)
+
+	assert_false(system.try_dash(0), "no debería dashear si la celda destino está bloqueada")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_ability_unlock_progress_marks_dash_unlocked_at_configured_tick() -> void:
+	var balance := _make_balance()
+	balance.abilities.dash_unlock_ticks = 3
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	for i in range(2):
+		system.tick(state)
+	assert_false(player.dash_unlocked, "todavía no debería estar desbloqueado")
+
+	system.tick(state)
+	assert_true(player.dash_unlocked, "debería desbloquearse exactamente al llegar a dash_unlock_ticks")
+
+
+func test_get_effective_speed_includes_ability_bonus() -> void:
+	var balance := _make_balance()
+	balance.abilities.speed_ability_bonus = 0.5
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+
+	assert_eq(system.get_effective_speed(player), 9.0, "6.0 base * (1 + 0.5 de la habilidad) = 9.0")

@@ -62,6 +62,8 @@ func _apply_pending_commands() -> void:
 			player_system.set_move_direction(command.player_id, command.direction)
 		elif command is PlaceBombCommand:
 			_apply_place_bomb(command.player_id)
+		elif command is DashCommand:
+			_apply_dash(command.player_id)
 
 	_pending_commands.clear()
 
@@ -74,6 +76,14 @@ func _apply_place_bomb(player_id: int) -> void:
 	var bomb_range := player_system.get_effective_bomb_range(player)
 	var max_bombs := player_system.get_effective_max_bombs(player)
 	bomb_system.place_bomb(player.grid_position, player_id, bomb_range, max_bombs)
+
+
+func _apply_dash(player_id: int) -> void:
+	var player := player_system.get_player(player_id)
+	if player == null or not player.alive:
+		return
+
+	player_system.try_dash(player_id)
 
 
 func _resolve_powerup_pickups() -> void:

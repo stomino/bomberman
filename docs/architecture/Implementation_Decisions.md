@@ -623,6 +623,89 @@ Sandbox con ventana real sí dio los valores exactos esperados en los dos
 casos. Se deja documentado por si en el futuro se automatizan tests de
 red headless que dependan de este cálculo.
 
+## Habilidades, primera pasada: Velocidad + Dash, loadout fijo
+
+**Decisión:** del backlog "Ideas futuras" (loadout de 2 habilidades por
+jugador), se implementó una primera pasada acotada a propósito
+(acordada con el dueño del producto): solo **Velocidad** (pasiva,
+disponible de entrada) + **Dash** (activa, se desbloquea a los 30s de
+partida), **loadout fijo para todos los jugadores** — sin pantalla de
+selección todavía. Empujar bombas y Flash quedan para después: son
+mecánicas más grandes, con decisiones de diseño propias sin resolver
+(Empujar bombas rompe la regla de "nunca pisar una bomba"; Flash es una
+primitiva de movimiento nueva, no una extensión de la actual).
+
+`AbilityBalance` (`scripts/engine/core/ability_balance.gd` +
+`config/ability_balance.json`) sigue el mismo patrón que `PowerUpBalance`:
+config propia, compuesta en `GameBalance.abilities`. `speed_ability_bonus`
+se suma directo al cálculo de `PlayerSystem.get_effective_speed()` — en
+esta pasada aplica igual para **todos** los jugadores, porque `Player`
+todavía no tiene un flag de "qué habilidades tiene equipadas" (el
+loadout fijo hardcodeado hace que sea indistinguible de un buff base por
+ahora). El día que exista selección real de loadout, "quién tiene esta
+habilidad" pasa a ser un dato de `Player`, no un cambio de fórmula — la
+canalización ya está armada para eso.
+
+`Player.ability_unlock_progress_ticks` es un **contador**, no un
+timestamp absoluto (mismo patrón que `shield_ticks_remaining`) —
+`PlayerSystem.tick()` lo incrementa cada tick mientras `dash_unlocked`
+sea falso; al llegar a `AbilityBalance.dash_unlock_ticks` (1800 = 30s a
+60 ticks/seg), desbloquea. Esto evita tener que pasarle `state.tick` a
+`reset_for_new_round`/a donde se crean los jugadores
+(`GameRoot._spawn_local_player`, `ServerRoot._on_peer_connected`).
+`reset_for_new_round()` resetea `dash_unlocked`/
+`ability_unlock_progress_ticks` (cada ronda arranca pareja, mismo
+criterio que los powerups); `_respawn()` (muerte dentro de la ronda) NO
+los resetea — igual que los powerups tampoco se pierden al morir.
+
+**`Player.move_distance_cells`** generaliza el movimiento (default `1`,
+`2` durante un dash) para que Dash reuse el mecanismo de
+`PlayerSystem._update_player()` en vez de un camino de movimiento
+aparte — único cambio al sistema de movimiento existente
+(`grid_position + move_direction` pasó a
+`grid_position + move_direction * move_distance_cells`), retrocompatible
+por el default `1`. `PlayerSystem.try_dash()` valida la celda intermedia
+Y la de destino antes de arrancar (si cualquiera está bloqueada, no pasa
+nada — mismo criterio fail-fast que el movimiento normal); el dash dura
+lo mismo en ticks que un paso normal, se siente como un impulso, no un
+desplazamiento proporcionalmente más lento.
+
+`DashCommand` sigue el mismo patrón que `PlaceBombCommand`
+(`GameManager._apply_pending_commands`/`_apply_dash`); el wiring de red
+(`GameRoot.try_dash`/`ClientRoot.try_dash`+`submit_dash`/
+`ServerRoot.submit_dash`) es un espejo exacto de cómo ya viaja
+`PlaceBombCommand`. Nueva acción de input `dash` en `project.godot`,
+tecla Shift (WASD ocupado para mover, Espacio para bomba).
+
+**Efecto colateral real, no un bug:** como el bonus de Velocidad aplica
+incondicionalmente a todos los jugadores, cambió la velocidad base
+efectiva de TODO el juego (antes 6.0 celdas/seg, ahora 7.2 con el
+default de `AbilityBalance`). Un test existente
+(`test_player_moves_one_cell_after_ticks_for_speed`) asumía la cantidad
+exacta de ticks para cruzar una celda con la velocidad vieja — se
+corrigió agregando `balance.abilities.speed_ability_bonus = 0.0` al
+helper `_make_balance()` de `test_player_system.gd`, para que los tests
+de movimiento/colisión no queden acoplados al default de
+`AbilityBalance` (que no es lo que están probando). Los tests que sí
+prueban habilidades fijan el valor que necesitan explícitamente.
+
+**Probado:** suite completa (72/72, incluye 9 tests nuevos: colisión del
+dash en celda intermedia y destino, dash antes de desbloquear, dash
+exitoso cubre 2 celdas, desbloqueo en el tick exacto, bonus de velocidad
+en el cálculo). Verificación visual real en Sandbox: forzar
+`dash_unlocked` sin esperar los 30s reales, activar el dash, confirmar
+por `grid_position` y captura de pantalla que se movió exactamente 2
+celdas — la primera corrida de la prueba falló por revisar el resultado
+demasiado pronto (el dash tarda 8 ticks reales en completarse a la
+velocidad efectiva actual), no por un bug real; quedó confirmado
+alargando la ventana de espera del script de verificación.
+
+**Fuera de esta pasada:** Empujar bombas, Flash, pantalla de selección
+de loadout, objetivos de desbloqueo por ubicación/estructura (solo
+tiempo fijo por ahora), cooldown de Dash una vez desbloqueado (se puede
+usar sin límite mientras no se esté moviendo — si el playtesting muestra
+que hace falta, es un campo más en `AbilityBalance`).
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

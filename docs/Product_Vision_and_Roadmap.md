@@ -239,6 +239,13 @@ mapa específico o procedural).
 
 ### Habilidades (loadout pre-partida)
 
+✅ **Primera pasada hecha:** Velocidad (pasiva, de entrada) + Dash
+(activa, se desbloquea a los 30s), loadout fijo para todos los
+jugadores — sin pantalla de selección todavía. Ver
+`docs/architecture/Implementation_Decisions.md`. Sigue pendiente todo lo
+demás de esta sección: Empujar bombas, Flash, selección real de
+loadout, objetivos de desbloqueo por ubicación/estructura.
+
 Cada jugador elige 2 habilidades antes de entrar: una disponible de
 entrada, la segunda se desbloquea al cumplir un objetivo en la ronda
 (llegar a un lugar, destruir una estructura especial, o un tiempo fijo

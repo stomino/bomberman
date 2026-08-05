@@ -69,6 +69,9 @@ var current_config_file: String = DEFAULT_CONFIG_PATH
 ## PowerUpBalance para el porqué.
 var powerups: PowerUpBalance = PowerUpBalance.new()
 
+## Balance de habilidades: mismo criterio que powerups. Ver AbilityBalance.
+var abilities: AbilityBalance = AbilityBalance.new()
+
 enum CharacterType {
 	NORMAL,
 	FAST,
@@ -110,6 +113,7 @@ func load_config(path: String = DEFAULT_CONFIG_PATH) -> bool:
 
 	_apply_config(json.data)
 	powerups.load_config()
+	abilities.load_config()
 	print("✅ Configuración cargada desde: ", path)
 	_print_config_summary()
 	return true

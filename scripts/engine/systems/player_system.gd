@@ -30,11 +30,23 @@ func tick(_state: GameState) -> void:
 	for player in players.values():
 		_update_player(player)
 		_tick_shield(player)
+		_tick_ability_unlock(player)
 
 
 func _tick_shield(player: Player) -> void:
 	if player.shield_ticks_remaining > 0:
 		player.shield_ticks_remaining -= 1
+
+
+func _tick_ability_unlock(player: Player) -> void:
+	if player.dash_unlocked:
+		return
+
+	player.ability_unlock_progress_ticks += 1
+
+	if player.ability_unlock_progress_ticks >= balance.abilities.dash_unlock_ticks:
+		player.dash_unlocked = true
+		GameLogger.info("Jugador %d desbloqueó Dash" % player.id, "PlayerSystem")
 
 
 func set_move_direction(player_id: int, direction: Vector2i) -> void:
@@ -100,8 +112,40 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 	player.next_direction = Vector2i.ZERO
 	player.move_ticks_elapsed = 0
 	player.move_ticks_total = _ticks_for_speed(get_effective_speed(player))
+	player.move_distance_cells = 1
 	player.is_moving = true
 	player.has_pending_move = true
+
+
+func try_dash(player_id: int) -> bool:
+	"""Habilidad Dash: 2 celdas en la dirección en la que el jugador está
+	mirando en vez de 1, respetando colisión — si la celda intermedia o la
+	de destino están bloqueadas, no pasa nada (mismo criterio fail-fast que
+	_try_start_move). Misma duración en ticks que un paso normal: se siente
+	como un impulso, no un desplazamiento más lento proporcional."""
+	var player := get_player(player_id)
+
+	if player == null or not player.alive or not player.dash_unlocked:
+		return false
+
+	if player.is_moving:
+		return false
+
+	var direction := player.facing_direction
+	var midpoint := player.grid_position + direction
+	var target := player.grid_position + direction * 2
+
+	if not _is_cell_free(midpoint) or not _is_cell_free(target):
+		return false
+
+	player.move_direction = direction
+	player.next_direction = Vector2i.ZERO
+	player.move_ticks_elapsed = 0
+	player.move_ticks_total = _ticks_for_speed(get_effective_speed(player))
+	player.move_distance_cells = 2
+	player.is_moving = true
+	player.has_pending_move = true
+	return true
 
 
 func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
@@ -114,13 +158,15 @@ func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	player.move_direction = Vector2i.ZERO
 	player.next_direction = Vector2i.ZERO
 	player.move_ticks_elapsed = 0
+	player.move_distance_cells = 1
 	player.is_moving = false
 	player.has_pending_move = false
 
 
 func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
 	"""A diferencia de _respawn (muerte dentro de una ronda), esto también
-	limpia los powerups acumulados: cada ronda arranca pareja."""
+	limpia los powerups acumulados y el progreso de habilidades: cada
+	ronda arranca pareja."""
 	var player := get_player(player_id)
 
 	if player == null:
@@ -133,10 +179,16 @@ func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
 	player.bomb_range_powerup_stacks = 0
 	player.extra_bomb_powerup_stacks = 0
 	player.shield_ticks_remaining = 0
+	player.dash_unlocked = false
+	player.ability_unlock_progress_ticks = 0
 
 
 func get_effective_speed(player: Player) -> float:
-	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack
+	# Loadout fijo por ahora (ver AbilityBalance): el bonus de la habilidad
+	# Velocidad aplica igual para todos los jugadores, no está gateado por
+	# ningún flag en Player todavía — eso llega con la selección real de
+	# loadout.
+	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack + balance.abilities.speed_ability_bonus
 	return balance.get_speed_for_character() * (1.0 + bonus)
 
 
@@ -260,12 +312,13 @@ func _update_player(player: Player) -> void:
 	if player.move_ticks_elapsed < player.move_ticks_total:
 		return
 
-	var next_cell := player.grid_position + player.move_direction
+	var next_cell := player.grid_position + player.move_direction * player.move_distance_cells
 
 	if _is_cell_free(next_cell):
 
 		player.grid_position = next_cell
 		player.move_ticks_elapsed = 0
+		player.move_distance_cells = 1
 
 		if player.next_direction != Vector2i.ZERO:
 			_try_start_move(player, player.next_direction)

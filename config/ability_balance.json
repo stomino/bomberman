@@ -1,0 +1,8 @@
+{
+    "speed": {
+        "bonus": 0.2
+    },
+    "dash": {
+        "unlock_ticks": 1800
+    }
+}

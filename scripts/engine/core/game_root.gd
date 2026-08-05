@@ -145,6 +145,10 @@ func try_place_bomb() -> void:
 	game_manager.queue_command(PlaceBombCommand.new(LOCAL_PLAYER_ID))
 
 
+func try_dash() -> void:
+	game_manager.queue_command(DashCommand.new(LOCAL_PLAYER_ID))
+
+
 func is_player_alive(player_id: int) -> bool:
 	var player := player_system.get_player(player_id)
 	return player != null and player.alive

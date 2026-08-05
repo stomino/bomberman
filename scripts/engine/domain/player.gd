@@ -25,7 +25,20 @@ var next_direction: Vector2i = Vector2i.ZERO
 var move_ticks_total: int = 1
 var move_ticks_elapsed: int = 0
 
+# Cuántas celdas cubre el movimiento en curso — 1 en un paso normal, 2 en
+# un dash. Generaliza _update_player() sin un camino de movimiento aparte
+# para Dash (ver PlayerSystem.try_dash).
+var move_distance_cells: int = 1
+
 var facing_direction: Vector2i = Vector2i.DOWN
 
 var is_moving: bool = false
 var has_pending_move: bool = false
+
+# Habilidades (ver docs/architecture/Implementation_Decisions.md): loadout
+# fijo por ahora (Velocidad de entrada + Dash desbloqueable). Progreso de
+# desbloqueo en ticks acumulados, no timestamp absoluto — mismo patrón que
+# shield_ticks_remaining, evita depender de state.tick en donde se crean
+# los jugadores.
+var dash_unlocked: bool = false
+var ability_unlock_progress_ticks: int = 0
