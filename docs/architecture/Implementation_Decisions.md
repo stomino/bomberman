@@ -480,6 +480,34 @@ transporte en sí) para no complicar el primer host manual con múltiples
 IPs candidatas — ENet igual podría funcionar sobre IPv6 si se le pasa
 esa dirección a mano.
 
+## Fase 4: marcador "VOS" para distinguir al jugador propio
+
+**Decisión:** `scenes/player.tscn` gana un hijo `Label` ("LocalIndicator",
+texto "VOS", amarillo con contorno negro, `visible = false` por
+default), posicionado arriba de la cabeza. `player_node.gd` lo prende o
+apaga en `_physics_process` según `is_local` — no en `set_game_root()`,
+a propósito: en Sandbox, `GameRoot._ready()` llama `set_game_root()`
+antes de que corra el propio `_ready()` del nodo Player (GameRoot es
+hermano y arranca antes en el orden de la escena), así que el `@onready
+var local_indicator` todavía no estaría asignado en ese momento.
+`_physics_process` siempre corre después de que el árbol completo
+terminó de armarse, así que ahí es seguro tanto para el caso estático
+(Sandbox) como para el dinámico (`ClientRoot._spawn_player_node`, donde
+el orden es al revés: `add_child()` dispara `_ready()` del hijo antes de
+que se llame `set_game_root()`).
+
+**Por qué:** con 2+ jugadores en pantalla (ver más arriba) todos se ven
+idénticos — no hay forma de saber "cuál soy yo" a simple vista sin esto.
+Se usa el mismo criterio de "arte de programador" que ya declara
+`game_renderer.gd` (texto/formas simples en vez de arte final) — es un
+placeholder funcional, reemplazable más adelante sin tocar Domain/Systems.
+
+Verificado visualmente (no solo por ausencia de errores): se corrió
+`scenes/main.tscn` con un script temporal fuera de headless que le sacó
+una captura de pantalla real después de unos frames, confirmando que el
+label aparece legible y bien posicionado arriba del jugador — se descartó
+el script después de verificar, no quedó en el repo.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

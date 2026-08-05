@@ -8,6 +8,7 @@ var player_id: int
 var is_local: bool = false
 
 @onready var anim_sprite: AnimatedSprite2D = $AnimatedSprite2D
+@onready var local_indicator: Label = $LocalIndicator
 
 var _holding_direction: bool = false
 var _blocked_anim_progress: float = 0.0
@@ -19,11 +20,19 @@ func set_game_root(root: GameRoot, id: int) -> void:
 	game_root = root
 	player_id = id
 	is_local = player_id == root.LOCAL_PLAYER_ID
+	# No se toca local_indicator acá: en Sandbox esto corre ANTES del
+	# _ready() de este mismo nodo (GameRoot es hermano y arranca antes en
+	# el orden de la escena), así que @onready todavía no lo asignó. Se
+	# aplica en _physics_process, que siempre corre después de que el
+	# árbol completo terminó de armarse.
 
 
 func _physics_process(delta: float) -> void:
 	if not game_root:
 		return
+
+	if local_indicator:
+		local_indicator.visible = is_local
 
 	visible = game_root.is_player_alive(player_id)
 	if not visible:
