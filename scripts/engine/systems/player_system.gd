@@ -33,6 +33,7 @@ func tick(_state: GameState) -> void:
 		_tick_ability_unlock(player)
 		_tick_speed_boost(player)
 		_tick_flash_cooldown(player)
+		_tick_bomb_push(player)
 
 
 func _tick_shield(player: Player) -> void:
@@ -50,6 +51,13 @@ func _tick_speed_boost(player: Player) -> void:
 func _tick_flash_cooldown(player: Player) -> void:
 	if player.flash_cooldown_ticks_remaining > 0:
 		player.flash_cooldown_ticks_remaining -= 1
+
+
+func _tick_bomb_push(player: Player) -> void:
+	if player.bomb_push_active_ticks_remaining > 0:
+		player.bomb_push_active_ticks_remaining -= 1
+	if player.bomb_push_cooldown_ticks_remaining > 0:
+		player.bomb_push_cooldown_ticks_remaining -= 1
 
 
 func _tick_ability_unlock(player: Player) -> void:
@@ -109,13 +117,13 @@ func _ticks_for_speed(speed: float) -> int:
 
 func _try_start_move(player: Player, direction: Vector2i) -> void:
 	"""Arranca el movimiento hacia direction solo si la celda destino es
-	caminable. Si tiene una bomba, intenta empujarla (ver
-	docs/architecture/Implementation_Decisions.md) en vez de bloquear
-	directo — solo el movimiento normal empuja, Dash/Flash no pasan por
-	acá y mantienen su comportamiento de siempre. Si la celda no es
-	caminable, o tiene una bomba que no se pudo empujar, el jugador queda
-	quieto mirando hacia esa dirección (facing_direction ya se seteó antes
-	de llamar a esto)."""
+	caminable y no tiene una bomba — salvo que la habilidad Empujar esté
+	activa (ver docs/architecture/Implementation_Decisions.md), en cuyo
+	caso caminar contra una bomba la dispara en vez de bloquear. Sin la
+	habilidad activa, una bomba bloquea exactamente igual que una pared.
+	Si la celda no es caminable, o tiene una bomba que no se pudo
+	disparar, el jugador queda quieto mirando hacia esa dirección
+	(facing_direction ya se seteó antes de llamar a esto)."""
 	var target := player.grid_position + direction
 	var ticks_total := _ticks_for_speed(get_effective_speed(player))
 
@@ -129,7 +137,8 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 
 	if bomb_system.is_cell_occupied_by_bomb(target):
 		var bomb := bomb_system.get_bomb_at(target)
-		if bomb == null or not bomb_system.try_push_bomb(bomb, direction, ticks_total):
+		var can_launch := player.bomb_push_active_ticks_remaining > 0
+		if bomb == null or not can_launch or not _launch_bomb(bomb, direction):
 			player.move_direction = Vector2i.ZERO
 			player.next_direction = Vector2i.ZERO
 			player.move_ticks_elapsed = 0
@@ -144,6 +153,10 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 	player.move_distance_cells = 1
 	player.is_moving = true
 	player.has_pending_move = true
+
+
+func _launch_bomb(bomb: Bomb, direction: Vector2i) -> bool:
+	return bomb_system.try_launch_bomb(bomb, direction, balance.abilities.bomb_push_launch_ticks_per_cell)
 
 
 func try_dash(player_id: int) -> bool:
@@ -225,6 +238,26 @@ func try_activate_speed_boost(player_id: int) -> bool:
 	return true
 
 
+func try_activate_bomb_push(player_id: int) -> bool:
+	"""Habilidad Empujar: abre una ventana de tiempo durante la cual
+	caminar contra una bomba la dispara (ver _try_start_move/_launch_bomb)
+	en vez de bloquear. Mismo patrón que Velocidad: disponible desde el
+	arranque, sujeta a cooldown, no depende de is_moving. La ventana no
+	se cierra con el primer uso — mientras dure, se puede disparar más de
+	una bomba."""
+	var player := get_player(player_id)
+
+	if player == null or not player.alive:
+		return false
+
+	if player.bomb_push_cooldown_ticks_remaining > 0:
+		return false
+
+	player.bomb_push_active_ticks_remaining = balance.abilities.bomb_push_window_ticks
+	player.bomb_push_cooldown_ticks_remaining = balance.abilities.bomb_push_cooldown_ticks
+	return true
+
+
 func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	var player := get_player(player_id)
 
@@ -261,6 +294,8 @@ func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
 	player.speed_boost_ticks_remaining = 0
 	player.speed_boost_cooldown_ticks_remaining = 0
 	player.flash_cooldown_ticks_remaining = 0
+	player.bomb_push_active_ticks_remaining = 0
+	player.bomb_push_cooldown_ticks_remaining = 0
 
 
 func get_effective_speed(player: Player) -> float:

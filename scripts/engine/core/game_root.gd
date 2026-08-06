@@ -157,18 +157,24 @@ func try_flash() -> void:
 	game_manager.queue_command(FlashCommand.new(LOCAL_PLAYER_ID))
 
 
+func try_bomb_push() -> void:
+	game_manager.queue_command(BombPushCommand.new(LOCAL_PLAYER_ID))
+
+
 func try_ability_slot(slot: int) -> void:
 	"""Resuelve qué habilidad dispara la tecla de este slot (elegida en el
 	menú principal, ver main_menu.gd) y llama al try_* correspondiente. No
 	hace falta overridear esto en ClientRoot: internamente llama a
-	try_dash/try_speed_boost/try_flash, que ClientRoot sí overridea para
-	mandar RPC en vez de encolar local — un solo lugar resuelve el slot
-	tanto para sandbox como para red."""
+	try_dash/try_speed_boost/try_flash/try_bomb_push, que ClientRoot sí
+	overridea para mandar RPC en vez de encolar local — un solo lugar
+	resuelve el slot tanto para sandbox como para red."""
 	match _selected_ability_for_slot(slot):
 		"dash":
 			try_dash()
 		"flash":
 			try_flash()
+		"push":
+			try_bomb_push()
 		_:
 			try_speed_boost()
 

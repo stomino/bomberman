@@ -154,6 +154,10 @@ func try_flash() -> void:
 	submit_flash.rpc_id(1)
 
 
+func try_bomb_push() -> void:
+	submit_bomb_push.rpc_id(1)
+
+
 # ============================================
 # RPC: recibido de verdad acá — aplica el estado autoritativo del servidor
 # sobre los mismos contenedores que los getters heredados de GameRoot ya
@@ -197,4 +201,9 @@ func submit_speed_boost() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func submit_flash() -> void:
+	pass
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func submit_bomb_push() -> void:
 	pass

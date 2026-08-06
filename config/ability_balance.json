@@ -11,5 +11,10 @@
     "flash": {
         "range": 2,
         "cooldown_ticks": 300
+    },
+    "push": {
+        "window_ticks": 120,
+        "cooldown_ticks": 300,
+        "launch_ticks_per_cell": 5
     }
 }

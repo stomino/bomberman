@@ -7,9 +7,10 @@ var timer: int
 var range: int
 var active: bool = true
 
-# Empujar bombas (ver docs/architecture/Implementation_Decisions.md):
-# mismo patrón que el movimiento del jugador — grid_pos solo cambia al
-# completar el deslizamiento, no al arrancarlo (BombSystem.try_push_bomb).
+# Habilidad Empujar (ver docs/architecture/Implementation_Decisions.md):
+# grid_pos se actualiza al instante en cada segmento del vuelo, no al
+# completarlo — estos campos son puramente cosméticos, para que
+# game_renderer.gd interpole el deslizamiento visual (BombSystem.try_launch_bomb).
 var move_direction: Vector2i = Vector2i.ZERO
 var move_ticks_total: int = 1
 var move_ticks_elapsed: int = 0

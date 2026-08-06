@@ -53,3 +53,10 @@ var speed_boost_cooldown_ticks_remaining: int = 0
 # Flash: teletransporte instantáneo, sin desbloqueo por tiempo (a
 # diferencia de Dash) — solo cooldown, mismo patrón que Velocidad.
 var flash_cooldown_ticks_remaining: int = 0
+
+# Empujar bombas (habilidad, no mecánica automática): mientras
+# bomb_push_active_ticks_remaining > 0, caminar contra una bomba la
+# dispara en vez de bloquear (ver PlayerSystem._try_start_move). Mismo
+# patrón dual duración+cooldown que Velocidad.
+var bomb_push_active_ticks_remaining: int = 0
+var bomb_push_cooldown_ticks_remaining: int = 0

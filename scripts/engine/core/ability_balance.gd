@@ -21,6 +21,10 @@ var dash_range: int = 3  # celdas que cubre el dash (1 = un paso normal)
 var flash_range: int = 2  # celdas que cubre el flash, sin validar el camino intermedio
 var flash_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 
+var bomb_push_window_ticks: int = 120  # 2s a 60 ticks/seg: ventana en la que caminar contra una bomba la dispara
+var bomb_push_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
+var bomb_push_launch_ticks_per_cell: int = 5  # más rápido que un paso normal (~10), se siente como un disparo
+
 
 static func load_from_file(path: String = DEFAULT_CONFIG_PATH) -> AbilityBalance:
 	var abilities := AbilityBalance.new()
@@ -68,3 +72,9 @@ func _apply_config(data: Dictionary) -> void:
 		var f = data["flash"]
 		if f.has("range"): flash_range = f["range"]
 		if f.has("cooldown_ticks"): flash_cooldown_ticks = f["cooldown_ticks"]
+
+	if data.has("push"):
+		var p = data["push"]
+		if p.has("window_ticks"): bomb_push_window_ticks = p["window_ticks"]
+		if p.has("cooldown_ticks"): bomb_push_cooldown_ticks = p["cooldown_ticks"]
+		if p.has("launch_ticks_per_cell"): bomb_push_launch_ticks_per_cell = p["launch_ticks_per_cell"]

@@ -4,8 +4,8 @@ extends Node2D
 ## Pasa el mapa elegido a la siguiente escena vía metadata del root del
 ## árbol — no amerita un autoload solo para este dato puntual.
 
-const ABILITY_NAMES := ["speed", "dash", "flash"]
-const ABILITY_LABELS := ["Velocidad", "Dash", "Flash"]
+const ABILITY_NAMES := ["speed", "dash", "flash", "push"]
+const ABILITY_LABELS := ["Velocidad", "Dash", "Flash", "Empujar"]
 
 var _maps_option: OptionButton
 var _ip_input: LineEdit

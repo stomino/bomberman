@@ -12,6 +12,9 @@ func test_loads_defaults_from_config_file() -> void:
 	assert_eq(abilities.dash_unlock_ticks, 0)
 	assert_true(abilities.flash_range > 0)
 	assert_true(abilities.flash_cooldown_ticks > 0)
+	assert_true(abilities.bomb_push_window_ticks > 0)
+	assert_true(abilities.bomb_push_cooldown_ticks > 0)
+	assert_true(abilities.bomb_push_launch_ticks_per_cell > 0)
 
 
 func test_instance_has_sane_defaults_without_loading() -> void:
@@ -24,6 +27,9 @@ func test_instance_has_sane_defaults_without_loading() -> void:
 	assert_true(abilities.dash_unlock_ticks > 0)
 	assert_true(abilities.flash_range > 0)
 	assert_true(abilities.flash_cooldown_ticks > 0)
+	assert_true(abilities.bomb_push_window_ticks > 0)
+	assert_true(abilities.bomb_push_cooldown_ticks > 0)
+	assert_true(abilities.bomb_push_launch_ticks_per_cell > 0)
 
 
 func test_game_balance_composes_ability_balance_on_load() -> void:

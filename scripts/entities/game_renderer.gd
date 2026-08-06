@@ -78,10 +78,10 @@ func _draw_bombs() -> void:
 	var cs := map.cell_size
 
 	for bomb in game_root.bomb_system.bombs:
-		# grid_pos ya es la celda destino (se actualiza al instante al
-		# empujar, ver BombSystem.try_push_bomb) — el deslizamiento visual
-		# va desde la celda vieja (grid_pos - move_direction) hacia acá, no
-		# al revés.
+		# grid_pos ya es la celda destino del segmento actual (se actualiza
+		# al instante al disparar/avanzar, ver BombSystem.try_launch_bomb) —
+		# el deslizamiento visual va desde la celda vieja
+		# (grid_pos - move_direction) hacia acá, no al revés.
 		var base_pos := map.grid_to_world(bomb.grid_pos.x, bomb.grid_pos.y)
 		var offset := -Vector2(bomb.move_direction) * ((1.0 - bomb.get_move_progress()) * cs)
 		var center := base_pos + offset

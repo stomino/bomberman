@@ -991,6 +991,16 @@ editor (o una build fresca) rescanee el proyecto.
 
 ## Empujar bombas: último ítem del backlog de Habilidades
 
+> **Superada por la siguiente entrada** ("Empujar bombas: rediseño como
+> habilidad seleccionable"): el dueño del producto revisó esta primera
+> versión (empuje automático de 1 celda al caminar) y pidió que fuera
+> una habilidad seleccionable, con la bomba disparándose varias celdas
+> hasta chocar, no un solo paso. Se deja esta entrada intacta como
+> registro histórico de las decisiones y el hallazgo real que motivaron
+> el diseño de `try_launch_bomb`/`_tick_bomb_movement` que sí sigue
+> vigente — la sección técnica sobre por qué `grid_pos` tiene que
+> actualizarse al instante sigue aplicando tal cual a la versión nueva.
+
 **Decisión:** caminar contra una bomba ya no bloquea sin más — la
 empuja una celda en la misma dirección, si esa celda está libre. Cinco
 decisiones de diseño, confirmadas con el dueño del producto:
@@ -1086,6 +1096,108 @@ red para el nuevo estado de `Bomb` es idéntico en tipo al que ya mueve
 `Player.move_direction` por snapshot desde Fase 4, y quedó cubierto por
 el test de round-trip con bomba a mitad de empuje — repetir la
 automatización de dos procesos no agregaba señal nueva.
+
+## Empujar bombas: rediseño como habilidad seleccionable
+
+**Por qué se rediseñó:** la primera versión (entrada anterior) hacía que
+caminar contra **cualquier** bomba la empujara automáticamente 1 celda,
+siempre — el dueño del producto la probó y pidió que fuera una **4ta
+habilidad seleccionable** más (junto a Velocidad/Dash/Flash, en el mismo
+menú de slots Q/E), y que el disparo fuera mucho más contundente: la
+bomba sale despedida en la dirección del empujón **hasta chocar con algo
+colisionable**, no una sola celda.
+
+**Decisión, confirmada con el dueño del producto:**
+
+1. **Es una habilidad, no una mecánica automática.** Activarla abre una
+   ventana de tiempo configurable (`bomb_push_window_ticks`, default 120
+   = 2s). Mientras dura, caminar contra **cualquier** bomba la dispara.
+   Sin la habilidad activa, una bomba vuelve a bloquear exactamente
+   igual que una pared — se revirtió por completo el comportamiento
+   automático de la entrada anterior.
+2. **La ventana no se consume con el primer uso.** Se puede disparar
+   más de una bomba mientras quede tiempo — solo el paso del tiempo
+   (vía tick) la cierra, no el hecho de haber disparado.
+3. **El jugador avanza** a la celda que la bomba deja libre (como en la
+   versión anterior) — no es un golpe que lo deja quieto.
+4. **La bomba viaja varias celdas**, no una — sigue en la misma
+   dirección, sola, celda por celda, hasta que la siguiente no sea
+   caminable o ya tenga otra bomba (mismo criterio fail-fast de
+   siempre).
+5. **Se frena si su camino cruza a otro jugador parado ahí** — único
+   lugar del motor donde la posición de un jugador bloquea algo (nunca
+   pasa en ningún otro caso: jugadores nunca se bloquean entre sí).
+   Excepción acotada solo a la bomba disparada, no un cambio general de
+   colisión jugador-jugador.
+6. **El timer sigue corriendo mientras vuela.** Si llega a cero a mitad
+   de camino, explota ahí donde esté en ese momento, no en la celda
+   donde habría terminado de frenarse.
+7. **Velocidad de vuelo configurable aparte** (`bomb_push_launch_ticks_per_cell`,
+   default 5 — más rápido que los ~10 ticks/celda de un paso normal, se
+   siente como un disparo), independiente de la velocidad del jugador
+   que la disparó (a diferencia de la versión anterior, que reusaba la
+   velocidad del jugador para que se movieran en sincronía — ya no hace
+   falta esa sincronía porque ahora solo el primer segmento del vuelo
+   coincide con el paso del jugador, el resto la bomba sigue sola).
+
+**`PlayerSystem._try_start_move` vuelve a su forma original** (bloquear
+si hay pared o bomba) **más** un nuevo camino condicional: si hay una
+bomba y `player.bomb_push_active_ticks_remaining > 0`, intenta
+`_launch_bomb()` antes de bloquear. `Player` gana
+`bomb_push_active_ticks_remaining`/`bomb_push_cooldown_ticks_remaining`
+— mismo patrón dual que Velocidad — y `try_activate_bomb_push()` (mismo
+patrón que `try_activate_speed_boost`) para activarla.
+
+**`BombSystem.try_push_bomb` se renombra a `try_launch_bomb`** — misma
+forma (falla si `is_moving`/pared/bomba en el destino; si pasa,
+`grid_pos` al instante + arranca `move_*`), pero ahora es solo el primer
+segmento de un vuelo potencialmente largo. `_tick_bomb_movement()` deja
+de simplemente "parar" al completar un segmento: calcula la siguiente
+celda y decide si seguir (avanza `grid_pos` al instante otra vez, resetea
+el contador de ticks del segmento, sigue `is_moving`) o frenarse ahí
+(pared/bomba/jugador). La razón de por qué `grid_pos` tiene que ser
+eager en **cada** segmento, no solo el primero, es la misma que ya
+documentó la entrada anterior para el primer segmento (evitar la
+ventana de inconsistencia entre `PlayerSystem.tick()` y
+`BombSystem.tick()`) — generalizada: además resuelve gratis "explota
+donde esté" (la explosión ya lee `bomb.grid_pos`, que siempre es la
+posición real y actual).
+
+**Cómo se chequea la colisión contra un jugador sin romper el
+aislamiento `BombSystem`/`PlayerSystem`:** `BombSystem` no puede
+depender de la clase `PlayerSystem` (violaría la decisión ya documentada
+en Fase 4 sobre bomb_range/max_bombs_for_owner — evita el acoplamiento
+circular). `BombSystem.tick(state, player_positions: Array[Vector2i] = [])`
+gana un parámetro opcional (default `[]`, ningún test/caller existente
+que no lo pasa se rompe); `GameManager.tick()` arma la lista desde
+`player_system.players.values()` después de tickear el movimiento de
+los jugadores, y se la pasa. Mismo criterio que ya usa `place_bomb()`
+para `bomb_range`/`max_bombs_for_owner`: el caller resuelve el dato
+derivado de jugadores, `BombSystem` solo recibe valores planos.
+
+**Menú principal:** `ABILITY_NAMES`/`ABILITY_LABELS` en `main_menu.gd`
+ganan una 4ta entrada, `"push"`/`"Empujar"` — asignable a cualquiera de
+los 2 slots (Q o E), sin tocar los defaults (Q=Velocidad, E=Dash).
+`GameRoot.try_ability_slot()` gana la rama `"push": try_bomb_push()`.
+Red: `BombPushCommand`, `GameManager._apply_bomb_push`,
+`ClientRoot.try_bomb_push()`/`submit_bomb_push`,
+`ServerRoot.submit_bomb_push()` — espejo exacto del resto de las
+habilidades.
+
+**Probado:** 92/92 tests — reemplaza los 5 tests de la versión anterior
+por 10 nuevos: bloqueo restaurado sin la habilidad activa, disparo que
+cruza varias celdas hasta chocar con una pared, se frena al cruzar la
+celda de otro jugador, se frena al cruzar la celda de otra bomba,
+explota en la celda donde esté si el timer se acaba a mitad de vuelo (no
+en la celda final — mapa ancho sin pared cerca para que la única causa
+de frenado sea el timer), la ventana no se consume con un solo disparo,
+cooldown bloquea y permite reactivar, Dash/Flash siguen sin disparar
+bombas aunque la habilidad esté activa. Verificado en vivo en Sandbox
+real (script temporal, descartado después): confirmado por captura que
+sin la habilidad activa el jugador queda bloqueado contra la bomba en el
+spawn, y que con la habilidad activa avanza varias celdas mientras la
+bomba sale disparada mucho más lejos, frenándose sola contra el borde
+del mapa.
 
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 

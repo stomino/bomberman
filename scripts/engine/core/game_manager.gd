@@ -49,7 +49,12 @@ func tick() -> void:
 
 	_apply_pending_commands()
 	player_system.tick(state)
-	bomb_system.tick(state)
+
+	var player_positions: Array[Vector2i] = []
+	for player in player_system.players.values():
+		player_positions.append(player.grid_position)
+	bomb_system.tick(state, player_positions)
+
 	player_system.apply_explosion_damage(bomb_system.get_danger_cells(), state.tick)
 	_resolve_powerup_pickups()
 	_check_round_end()
@@ -68,6 +73,8 @@ func _apply_pending_commands() -> void:
 			_apply_speed_boost(command.player_id)
 		elif command is FlashCommand:
 			_apply_flash(command.player_id)
+		elif command is BombPushCommand:
+			_apply_bomb_push(command.player_id)
 
 	_pending_commands.clear()
 
@@ -104,6 +111,14 @@ func _apply_flash(player_id: int) -> void:
 		return
 
 	player_system.try_flash(player_id)
+
+
+func _apply_bomb_push(player_id: int) -> void:
+	var player := player_system.get_player(player_id)
+	if player == null or not player.alive:
+		return
+
+	player_system.try_activate_bomb_push(player_id)
 
 
 func _resolve_powerup_pickups() -> void:
