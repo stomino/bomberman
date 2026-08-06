@@ -4,9 +4,11 @@ extends RefCounted
 ## Cuánto vale cada habilidad, separado a propósito de GameBalance —
 ## mismo criterio que PowerUpBalance (ver
 ## docs/architecture/Implementation_Decisions.md). Primera pasada: loadout
-## fijo para todos los jugadores (Velocidad de entrada + Dash
-## desbloqueable por tiempo); "quién tiene esta habilidad" todavía no es
-## un dato de Player, así que estos valores aplican igual para todos.
+## fijo para todos los jugadores (Velocidad en Q, Dash en E); "quién
+## tiene esta habilidad" todavía no es un dato de Player, así que estos
+## valores aplican igual para todos. Todo lo que se pueda balancear de
+## una habilidad (cooldowns, duraciones, alcances) va acá, no hardcodeado
+## en PlayerSystem — un solo lugar para ajustar todo.
 
 const DEFAULT_CONFIG_PATH := "res://config/ability_balance.json"
 
@@ -15,6 +17,7 @@ var speed_boost_duration_ticks: int = 180  # 3s a 60 ticks/seg
 var speed_boost_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 
 var dash_unlock_ticks: int = 1800  # 30s a 60 ticks/seg
+var dash_range: int = 3  # celdas que cubre el dash (1 = un paso normal)
 
 
 static func load_from_file(path: String = DEFAULT_CONFIG_PATH) -> AbilityBalance:
@@ -57,3 +60,4 @@ func _apply_config(data: Dictionary) -> void:
 	if data.has("dash"):
 		var d = data["dash"]
 		if d.has("unlock_ticks"): dash_unlock_ticks = d["unlock_ticks"]
+		if d.has("range"): dash_range = d["range"]

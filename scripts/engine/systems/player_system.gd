@@ -126,11 +126,12 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 
 
 func try_dash(player_id: int) -> bool:
-	"""Habilidad Dash: 2 celdas en la dirección en la que el jugador está
-	mirando en vez de 1, respetando colisión — si la celda intermedia o la
-	de destino están bloqueadas, no pasa nada (mismo criterio fail-fast que
-	_try_start_move). Misma duración en ticks que un paso normal: se siente
-	como un impulso, no un desplazamiento más lento proporcional."""
+	"""Habilidad Dash: balance.abilities.dash_range celdas en la dirección
+	en la que el jugador está mirando en vez de 1, respetando colisión —
+	si cualquier celda del camino (no solo la de destino) está bloqueada,
+	no pasa nada (mismo criterio fail-fast que _try_start_move). Misma
+	duración en ticks que un paso normal: se siente como un impulso, no un
+	desplazamiento más lento proporcional a la distancia."""
 	var player := get_player(player_id)
 
 	if player == null or not player.alive or not player.dash_unlocked:
@@ -140,17 +141,17 @@ func try_dash(player_id: int) -> bool:
 		return false
 
 	var direction := player.facing_direction
-	var midpoint := player.grid_position + direction
-	var target := player.grid_position + direction * 2
+	var dash_range := balance.abilities.dash_range
 
-	if not _is_cell_free(midpoint) or not _is_cell_free(target):
-		return false
+	for step in range(1, dash_range + 1):
+		if not _is_cell_free(player.grid_position + direction * step):
+			return false
 
 	player.move_direction = direction
 	player.next_direction = Vector2i.ZERO
 	player.move_ticks_elapsed = 0
 	player.move_ticks_total = _ticks_for_speed(get_effective_speed(player))
-	player.move_distance_cells = 2
+	player.move_distance_cells = dash_range
 	player.is_moving = true
 	player.has_pending_move = true
 	return true

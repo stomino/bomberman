@@ -5,6 +5,7 @@
         "boost_cooldown_ticks": 300
     },
     "dash": {
-        "unlock_ticks": 1800
+        "unlock_ticks": 1800,
+        "range": 3
     }
 }

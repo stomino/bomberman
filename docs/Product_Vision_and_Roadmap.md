@@ -239,12 +239,35 @@ mapa específico o procedural).
 
 ### Habilidades (loadout pre-partida)
 
-✅ **Primera pasada hecha:** Velocidad (pasiva, de entrada) + Dash
-(activa, se desbloquea a los 30s), loadout fijo para todos los
-jugadores — sin pantalla de selección todavía. Ver
+✅ **Primera pasada hecha:** Velocidad (ráfaga temporal con cooldown,
+tecla **Q**, disponible de entrada) + Dash (tecla **E**, se desbloquea a
+los 30s, alcance configurable — 3 celdas por defecto). Loadout fijo para
+todos los jugadores — sin pantalla de selección todavía. Todo lo
+balanceable de cada habilidad (bonus, duración, cooldown, alcance,
+tiempo de desbloqueo) vive en `config/ability_balance.json`, no
+hardcodeado — un solo lugar para ajustar números. Ver
 `docs/architecture/Implementation_Decisions.md`. Sigue pendiente todo lo
 demás de esta sección: Empujar bombas, Flash, selección real de
 loadout, objetivos de desbloqueo por ubicación/estructura.
+
+**Diseño del sistema de slots (documentado, todavía sin implementar):**
+cada jugador tiene 2 slots de habilidad — **Q** (slot 1) y **E** (slot
+2). El jugador elige qué habilidad va en cada slot; según dónde la
+ponga, la tiene disponible desde el arranque de la ronda (slot Q) o
+recién al cumplir la condición de desbloqueo de ese slot (slot E) — la
+habilidad en sí no está atada a un slot fijo, es el jugador quien decide
+el orden. Flujo previo a la partida imaginado: cola competitiva → se
+encuentra un rival → se elige/vetea el mapa → cada jugador elige
+personaje (por ahora solo estético) → cada jugador elige sus 2
+habilidades y en qué slot va cada una. Esto es un feature del tamaño de
+"Partidas" (matchmaking, veto de mapa, selección) — no se construye de
+una, queda como diseño de referencia para cuando se aborde esa fase.
+
+**Feedback visual de habilidades — pendiente:** hoy es difícil notar si
+una habilidad se activó (Dash es obvio porque se ve al personaje
+desplazarse distinto; la ráfaga de Velocidad casi no se percibe a
+simple vista). Falta pensar una forma visual consistente de mostrar, por
+habilidad: si está disponible, en cooldown, o si acaba de activarse.
 
 Cada jugador elige 2 habilidades antes de entrar: una disponible de
 entrada, la segunda se desbloquea al cumplir un objetivo en la ronda
@@ -253,7 +276,7 @@ como 30 segundos). Es la pieza que más le da identidad competitiva
 propia al juego (a diferencia de Bomberman clásico). Lista inicial a
 seguir expandiendo: empujar bombas, multiplicador de velocidad inicial,
 flash hacia adelante (salta 1 casilla, ignora colisión), dash hacia
-adelante (1 casilla más lejos, respeta colisión).
+adelante (respeta colisión).
 
 Es un feature de tamaño comparable a powerups + rondas juntos — no un
 agregado chico. Encaja con el mismo patrón ya usado para separar
@@ -271,8 +294,7 @@ Decisiones de diseño reales que van a aparecer (no resueltas todavía):
   actual: el movimiento por tick asume siempre una celda adyacente
   validada. Falta decidir si valida solo la celda de aterrizaje (no la
   de en medio) y qué pasa si esa celda tiene una bomba o está fuera del
-  mapa. **Dash** es más simple: básicamente 2 celdas en vez de 1,
-  respetando colisión igual que hoy.
+  mapa.
 - Los objetivos de desbloqueo por ubicación o estructura especial
   encajan extendiendo `MapDefinition` (posiciones de objetivo, mismo
   patrón que `spawn_positions`, incluso pintable en el editor) y

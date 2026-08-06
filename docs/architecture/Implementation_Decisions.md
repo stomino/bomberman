@@ -725,6 +725,32 @@ tiempo fijo por ahora), cooldown de Dash una vez desbloqueado (se puede
 usar sin límite mientras no se esté moviendo — si el playtesting muestra
 que hace falta, es un campo más en `AbilityBalance`).
 
+## Habilidades: alcance de Dash configurable, no hardcodeado
+
+**Decisión:** el pedido explícito del dueño del producto fue "quiero que
+las habilidades sean fáciles de balancear... poder corregir en un solo
+lugar cosas como cooldowns, duraciones, alcances". Auditando el código
+existente, el único valor de una habilidad que NO estaba en
+`AbilityBalance` era el alcance de Dash — estaba hardcodeado como `2` en
+`PlayerSystem.try_dash()`. Se agregó `AbilityBalance.dash_range: int = 3`
+(`config/ability_balance.json`, `dash.range`) y `try_dash()` pasó de
+chequear a mano "celda intermedia + celda destino" (asumía 2 celdas fijo)
+a un loop `for step in range(1, dash_range + 1)` que valida **cada**
+celda del camino — necesario para que un alcance de 3+ celdas respete
+colisión en el medio, no solo al final. `player.move_distance_cells` se
+fija a `dash_range` en vez de un `2` literal.
+
+De paso, siguiendo el mismo pedido como ejemplo concreto de balance, se
+subió el default de 2 a 3 celdas ("una casilla más de alcance").
+
+**Nota de nombrado:** dentro de `try_dash()` la variable local se llama
+`dash_range`, no `range` — GDScript no tiene problema en que una
+variable local se llame igual que una función built-in, pero
+`range()` (la función que arma la secuencia del `for`) queda
+tapada/shadowed dentro de ese scope si se usa ese nombre, y el `for step
+in range(...)` de la misma función dejaría de compilar. Vale la pena
+dejarlo anotado porque es un error fácil de reintroducir sin querer.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

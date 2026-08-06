@@ -242,8 +242,9 @@ func test_respawn_grants_temporary_invulnerability() -> void:
 	assert_true(system.is_shielded(player), "debería tener invulnerabilidad de spawn recién respawneado")
 
 
-func test_dash_moves_two_cells_when_unlocked_and_path_clear() -> void:
+func test_dash_moves_dash_range_cells_when_unlocked_and_path_clear() -> void:
 	var balance := _make_balance()
+	balance.abilities.dash_range = 2
 	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
 	var system := PlayerSystem.new(map, balance, bombs)
@@ -258,7 +259,7 @@ func test_dash_moves_two_cells_when_unlocked_and_path_clear() -> void:
 	for i in range(10):  # misma duración que un paso normal, ver _make_balance
 		system.tick(state)
 
-	assert_eq(player.grid_position, Vector2i(4, 2), "el dash debería cubrir 2 celdas, no 1")
+	assert_eq(player.grid_position, Vector2i(4, 2), "el dash debería cubrir dash_range celdas, no 1")
 
 
 func test_dash_fails_when_not_unlocked() -> void:
@@ -277,6 +278,7 @@ func test_dash_fails_when_not_unlocked() -> void:
 
 func test_dash_respects_collision_on_intermediate_cell() -> void:
 	var balance := _make_balance()
+	balance.abilities.dash_range = 2
 	var map := GameMap.from_balance(balance)
 	map.set_cell(3, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda intermedia bloqueada
 	var bombs := BombSystem.new(map, balance)
@@ -292,6 +294,7 @@ func test_dash_respects_collision_on_intermediate_cell() -> void:
 
 func test_dash_respects_collision_on_destination_cell() -> void:
 	var balance := _make_balance()
+	balance.abilities.dash_range = 2
 	var map := GameMap.from_balance(balance)
 	map.set_cell(4, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda destino bloqueada
 	var bombs := BombSystem.new(map, balance)
@@ -303,6 +306,26 @@ func test_dash_respects_collision_on_destination_cell() -> void:
 
 	assert_false(system.try_dash(0), "no debería dashear si la celda destino está bloqueada")
 	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_dash_range_is_configurable_and_checks_the_whole_path() -> void:
+	"""dash_range es un valor de balance (config/ability_balance.json),
+	no una constante hardcodeada — este test prueba explícitamente un
+	rango distinto al default y confirma que se valida CADA celda del
+	camino, no solo la primera y la última."""
+	var balance := _make_balance()
+	balance.abilities.dash_range = 4
+	balance.map_width = 10  # mapa más ancho que el default: que el destino (celda 4) no coincida con el borde
+	var map := GameMap.from_balance(balance)
+	map.set_cell(4, 2, GameMap.CELL_INDESTRUCTIBLE)  # tercera celda del camino (de 4), ni intermedia ni destino
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	player.dash_unlocked = true
+	system.add_player(player)
+
+	assert_false(system.try_dash(0), "debería bloquearse por una celda bloqueada en el medio del camino, no solo al inicio/fin")
 
 
 func test_ability_unlock_progress_marks_dash_unlocked_at_configured_tick() -> void:
