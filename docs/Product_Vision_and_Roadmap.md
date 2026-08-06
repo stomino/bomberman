@@ -269,22 +269,15 @@ desplazarse distinto; la ráfaga de Velocidad casi no se percibe a
 simple vista). Falta pensar una forma visual consistente de mostrar, por
 habilidad: si está disponible, en cooldown, o si acaba de activarse.
 
-Cada jugador elige 2 habilidades antes de entrar: una disponible de
-entrada, la segunda se desbloquea al cumplir un objetivo en la ronda
-(llegar a un lugar, destruir una estructura especial, o un tiempo fijo
-como 30 segundos). Es la pieza que más le da identidad competitiva
-propia al juego (a diferencia de Bomberman clásico). Lista inicial a
-seguir expandiendo: empujar bombas, multiplicador de velocidad inicial,
-flash hacia adelante (salta 1 casilla, ignora colisión), dash hacia
-adelante (respeta colisión).
+Es la pieza que más le da identidad competitiva propia al juego (a
+diferencia de Bomberman clásico) — de tamaño comparable a powerups +
+rondas juntos, no un agregado chico. Encaja con el mismo patrón ya usado
+para separar `PowerUpBalance` de `GameBalance`: `AbilityBalance` como
+config propia, `PlayerSystem` extendido para desbloqueo/activación en
+vez de un system nuevo.
 
-Es un feature de tamaño comparable a powerups + rondas juntos — no un
-agregado chico. Encaja con el mismo patrón ya usado para separar
-`PowerUpBalance` de `GameBalance`: un dominio nuevo (`Ability`), un
-balance propio, un system (o extensión de `PlayerSystem`) para
-desbloqueo y activación.
-
-Decisiones de diseño reales que van a aparecer (no resueltas todavía):
+Decisiones de diseño reales que van a aparecer con lo que falta (no
+resueltas todavía):
 
 - **Empujar bombas** rompe la regla actual de "nunca se puede pisar una
   bomba" — necesita una rama de lógica nueva (desplazar la bomba en vez
