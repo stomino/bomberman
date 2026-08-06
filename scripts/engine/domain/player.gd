@@ -49,3 +49,7 @@ var ability_unlock_progress_ticks: int = 0
 # shield_ticks_remaining.
 var speed_boost_ticks_remaining: int = 0
 var speed_boost_cooldown_ticks_remaining: int = 0
+
+# Flash: teletransporte instantáneo, sin desbloqueo por tiempo (a
+# diferencia de Dash) — solo cooldown, mismo patrón que Velocidad.
+var flash_cooldown_ticks_remaining: int = 0

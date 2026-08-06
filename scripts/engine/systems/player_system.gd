@@ -32,6 +32,7 @@ func tick(_state: GameState) -> void:
 		_tick_shield(player)
 		_tick_ability_unlock(player)
 		_tick_speed_boost(player)
+		_tick_flash_cooldown(player)
 
 
 func _tick_shield(player: Player) -> void:
@@ -44,6 +45,11 @@ func _tick_speed_boost(player: Player) -> void:
 		player.speed_boost_ticks_remaining -= 1
 	if player.speed_boost_cooldown_ticks_remaining > 0:
 		player.speed_boost_cooldown_ticks_remaining -= 1
+
+
+func _tick_flash_cooldown(player: Player) -> void:
+	if player.flash_cooldown_ticks_remaining > 0:
+		player.flash_cooldown_ticks_remaining -= 1
 
 
 func _tick_ability_unlock(player: Player) -> void:
@@ -157,6 +163,36 @@ func try_dash(player_id: int) -> bool:
 	return true
 
 
+func try_flash(player_id: int) -> bool:
+	"""Habilidad Flash: teletransporte instantáneo balance.abilities.flash_range
+	celdas en la dirección en la que el jugador está mirando. A diferencia
+	de Dash, solo valida la celda de aterrizaje — puede "saltar" sobre
+	bombas u obstáculos en el medio del camino, es lo que le da identidad
+	propia frente a Dash. No reusa el pipeline de move_ticks_total/
+	is_moving (Dash sí, para sentirse como un impulso): grid_position
+	cambia en el mismo tick que se activa, sin animación de recorrido. Por
+	eso tampoco requiere `not player.is_moving` como Dash — no hay estado
+	de movimiento en curso con el que pueda pisarse."""
+	var player := get_player(player_id)
+
+	if player == null or not player.alive:
+		return false
+
+	if player.flash_cooldown_ticks_remaining > 0:
+		return false
+
+	var direction := player.facing_direction
+	var flash_range := balance.abilities.flash_range
+	var target := player.grid_position + direction * flash_range
+
+	if not _is_cell_free(target):
+		return false
+
+	player.grid_position = target
+	player.flash_cooldown_ticks_remaining = balance.abilities.flash_cooldown_ticks
+	return true
+
+
 func try_activate_speed_boost(player_id: int) -> bool:
 	"""Habilidad Velocidad: ráfaga temporal, disponible desde el arranque
 	(a diferencia de Dash, no necesita desbloquearse) pero sujeta a
@@ -209,6 +245,7 @@ func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
 	player.ability_unlock_progress_ticks = 0
 	player.speed_boost_ticks_remaining = 0
 	player.speed_boost_cooldown_ticks_remaining = 0
+	player.flash_cooldown_ticks_remaining = 0
 
 
 func get_effective_speed(player: Player) -> float:

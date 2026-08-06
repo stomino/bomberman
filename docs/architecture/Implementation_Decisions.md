@@ -873,6 +873,122 @@ tapada/shadowed dentro de ese scope si se usa ese nombre, y el `for step
 in range(...)` de la misma función dejaría de compilar. Vale la pena
 dejarlo anotado porque es un error fácil de reintroducir sin querer.
 
+## Habilidad Flash + selección de habilidades por slot en el menú
+
+**El problema real:** hasta acá el loadout de habilidades era fijo en
+código — Velocidad siempre en Q, Dash siempre en E
+(`player_node.gd._input()` llamaba directo a `try_speed_boost()`/
+`try_dash()` según el nombre literal de la acción de input). Al diseñar
+una tercera habilidad (Flash), agregarla reemplazando a Dash en la tecla
+E habría sido arbitrario — el dueño del producto pidió en su lugar que el
+**menú principal** deje elegir qué habilidad va en cada tecla, de las 3
+disponibles.
+
+**Decisión — Flash, tres decisiones de diseño que el roadmap dejaba
+abiertas:**
+1. **Validación: solo la celda de aterrizaje.** A diferencia de Dash
+   (`PlayerSystem.try_dash`, valida cada celda del camino con un loop
+   `for step in range(1, dash_range + 1)`), `try_flash()` calcula
+   directo `target := grid_position + facing_direction * flash_range` y
+   solo valida esa celda (`_is_cell_free(target)`, la misma función que
+   ya maneja fuera-de-mapa vía `GameMap.is_walkable` →
+   `is_within_bounds`, sin código nuevo para ese caso). Puede "saltar"
+   sobre bombas u obstáculos intermedios — es lo que le da identidad
+   propia frente a Dash, que si no sería un Dash con otro alcance.
+2. **Instantáneo, no animado.** No reusa el pipeline de
+   `move_direction`/`move_ticks_total`/`is_moving` que sí usa Dash (ver
+   "Habilidades, primera pasada" más arriba) — `try_flash()` asigna
+   `grid_position` directo, en el mismo tick que se llama. Por eso
+   tampoco necesita el guard `not player.is_moving` que sí tiene Dash: al
+   no tocar el estado de movimiento en curso, no hay con qué pisarse —
+   si el jugador estaba a mitad de cruzar una celda por un paso normal,
+   esa animación simplemente sigue desde la nueva posición.
+3. **Desbloqueo: solo cooldown, disponible desde el arranque** — mismo
+   patrón que Velocidad (`flash_cooldown_ticks_remaining`, decrementado
+   en `_tick_flash_cooldown()`), sin el mecanismo de desbloqueo por
+   tiempo que sí tiene Dash (`dash_unlocked`/
+   `ability_unlock_progress_ticks`). Resto del wiring (`FlashCommand`,
+   `GameManager._apply_flash`, `GameRoot.try_flash`,
+   `ClientRoot.try_flash`/`submit_flash`, `ServerRoot.submit_flash`) es un
+   espejo exacto de cómo ya viaja Dash en cada capa.
+
+**Decisión — generalizar input a slots, no a habilidades específicas:**
+las acciones de `project.godot` `speed_boost`/`dash` se renombraron a
+`ability_1`/`ability_2` (mismas teclas físicas, Q/E — nadie nota el
+cambio si no toca el menú nuevo). `player_node.gd._input()` ya no llama
+`try_speed_boost()`/`try_dash()` directo; llama
+`game_root.try_ability_slot(1)`/`try_ability_slot(2)`.
+`GameRoot.try_ability_slot(slot)` resuelve qué habilidad corresponde
+(lee `get_tree().root.get_meta("ability_slot_1"/"ability_slot_2")`,
+default `speed`/`dash` si no hay meta — preserva el comportamiento de
+antes para quien no toque el menú nuevo) y llama al `try_*`
+correspondiente. **No hizo falta overridearlo en `ClientRoot`**: como
+internamente llama a los métodos que `ClientRoot` sí overridea
+(`try_dash`/`try_speed_boost`/`try_flash`, que mandan RPC en vez de
+encolar local), el mismo código sirve para sandbox y red sin duplicar
+nada — mismo criterio que ya motivó unificar el pipeline de Commands en
+Fase 4.
+
+**Decisión — selección en el menú, alcance explícito:** `main_menu.gd`
+gana dos `OptionButton` ("Habilidad 1 (Q)"/"Habilidad 2 (E)", opciones
+Velocidad/Dash/Flash, default Q=Velocidad E=Dash — igual que el
+comportamiento de siempre). La selección se guarda vía
+`get_tree().root.set_meta("ability_slot_1"/"ability_slot_2", ...)` antes
+de ir a Sandbox o Cliente — mismo patrón ya usado para
+`selected_map_path`/`server_ip`. **No** se pasa al camino de Servidor: el
+servidor no tiene input propio ni Presentation (ver Fase 4), así que la
+selección es irrelevante ahí. Importante: esto es una **conveniencia de
+qué tecla dispara qué llamada**, no una restricción real de "solo 2 de 3
+habilidades disponibles" — el servidor no conoce ni valida la selección
+del cliente, solo ejecuta el RPC que le llegue (`submit_flash`,
+`submit_dash`, etc., los tres siguen existiendo y siendo válidos siempre
+para cualquier jugador). Un sistema de loadout real con validación
+server-side, veto de mapa, y flujo de selección pre-partida sigue siendo
+trabajo futuro más grande — ver "Diseño del sistema de slots" en
+`docs/Product_Vision_and_Roadmap.md`.
+
+**Decisión — todas las habilidades disponibles desde el arranque, para
+pruebas:** pedido explícito del dueño del producto — "para pruebas da lo
+mismo cuál habilidad va en qué slot, todas están disponibles desde el
+inicio". Único cambio: `config/ability_balance.json`,
+`dash.unlock_ticks` de `1800` a `0` — con esto `dash_unlocked` pasa a
+`true` en el primer tick (`ability_unlock_progress_ticks` empieza en 0,
+se incrementa a 1, `1 >= 0`), en vez de a los 30s. El mecanismo de
+`PlayerSystem`/`Player` que hace el desbloqueo por tiempo **no se tocó**
+— queda intacto y reversible con solo cambiar el número de vuelta, para
+cuando se quiera retomar la idea (mencionada por el dueño del producto)
+de que la habilidad del slot 2 se desbloquee por alguna condición (ej.
+tiempo transcurrido de ronda) mientras la del slot 1 esté siempre
+disponible — eso es un rediseño más grande (el desbloqueo pasaría a ser
+por slot, no por habilidad específica como hoy) que se deja para cuando
+se aborde de verdad el sistema de loadout.
+
+**Probado:** 83/83 tests (agrega 6 nuevos de Flash en
+`tests/unit/test_player_system.gd` — aterrizaje ignorando obstáculos
+intermedios, falla si la celda de aterrizaje está bloqueada, falla si
+cae fuera del mapa, instantáneo/no-animado, cooldown bloquea y luego
+permite reactivar; también actualiza `tests/unit/test_ability_balance.gd`
+para reflejar `dash_unlock_ticks = 0` en la config real). Verificado en
+vivo con un script temporal (descartado después, no quedó en el repo)
+que arrancó Sandbox real, activó slot 1 (Flash) y slot 2 (Dash) por
+código (sin depender de foco de ventana/teclado, que resultó poco
+confiable para automatizar en este entorno) y confirmó por captura de
+pantalla real que el jugador saltó sobre el clúster de bloques
+destructibles con Flash y siguió el descenso con Dash. También probado
+en red real (servidor headless + cliente): el cliente mandó
+`submit_flash`, el servidor lo aplicó vía `FlashCommand`, y el siguiente
+snapshot reflejó la nueva posición en el cliente.
+
+**Nota aparte, encontrada durante esta verificación:** el archivo nuevo
+`flash_command.gd` no era resuelto por nombre de clase global
+(`FlashCommand` no declarado) hasta que Godot regeneró
+`.godot/global_script_class_cache.cfg` — ese archivo es un caché de
+build (gitignored, no versionado) que Godot arma escaneando `class_name`
+en el proyecto; una corrida vía `-s script.gd` no dispara ese escaneo
+por sí sola si el caché ya existía de una corrida anterior. No es un bug
+de código, es un artefacto de caché local — se resuelve solo con que el
+editor (o una build fresca) rescanee el proyecto.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

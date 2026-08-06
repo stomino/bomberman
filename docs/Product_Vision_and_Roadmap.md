@@ -239,29 +239,41 @@ mapa específico o procedural).
 
 ### Habilidades (loadout pre-partida)
 
-✅ **Primera pasada hecha:** Velocidad (ráfaga temporal con cooldown,
-tecla **Q**, disponible de entrada) + Dash (tecla **E**, se desbloquea a
-los 30s, alcance configurable — 3 celdas por defecto). Loadout fijo para
-todos los jugadores — sin pantalla de selección todavía. Todo lo
-balanceable de cada habilidad (bonus, duración, cooldown, alcance,
-tiempo de desbloqueo) vive en `config/ability_balance.json`, no
-hardcodeado — un solo lugar para ajustar números. Ver
-`docs/architecture/Implementation_Decisions.md`. Sigue pendiente todo lo
-demás de esta sección: Empujar bombas, Flash, selección real de
-loadout, objetivos de desbloqueo por ubicación/estructura.
+✅ **Segunda pasada hecha:** tres habilidades — Velocidad (ráfaga con
+cooldown), Dash (alcance configurable, desbloqueo por tiempo — hoy
+neutralizado a 0 para pruebas), Flash (teletransporte instantáneo que
+ignora obstáculos intermedios, solo cooldown). El menú principal deja
+elegir qué habilidad va en cada slot (**Q**/**E**) de las 3 — ya no es un
+loadout fijo en código, aunque todavía sin restricción real de "solo 2
+de N" (el servidor no valida la selección, cualquier jugador puede usar
+cualquier habilidad — ver más abajo). Todo lo balanceable de cada
+habilidad (bonus, duración, cooldown, alcance, tiempo de desbloqueo)
+vive en `config/ability_balance.json`, no hardcodeado — un solo lugar
+para ajustar números. Ver `docs/architecture/Implementation_Decisions.md`.
+Sigue pendiente: Empujar bombas, selección real de loadout (con
+validación server-side), objetivos de desbloqueo por ubicación/
+estructura.
 
-**Diseño del sistema de slots (documentado, todavía sin implementar):**
-cada jugador tiene 2 slots de habilidad — **Q** (slot 1) y **E** (slot
-2). El jugador elige qué habilidad va en cada slot; según dónde la
-ponga, la tiene disponible desde el arranque de la ronda (slot Q) o
-recién al cumplir la condición de desbloqueo de ese slot (slot E) — la
-habilidad en sí no está atada a un slot fijo, es el jugador quien decide
-el orden. Flujo previo a la partida imaginado: cola competitiva → se
-encuentra un rival → se elige/vetea el mapa → cada jugador elige
+**Diseño del sistema de slots — versión de pruebas hecha, versión real
+pendiente:** cada jugador tiene 2 slots de habilidad — **Q** (slot 1) y
+**E** (slot 2). Hoy el menú principal ya deja elegir qué habilidad va en
+cada slot (de Velocidad/Dash/Flash) y las dos están disponibles desde el
+arranque, sin restricción — es una conveniencia de qué tecla dispara qué
+llamada, pensada solo para poder probar las 3 habilidades libremente.
+Todavía **no** implementado, y documentado como diseño de referencia: que
+el slot Q tenga la habilidad disponible desde el arranque de la ronda y
+el slot E recién al cumplir una condición de desbloqueo (la habilidad en
+sí no estaría atada a un slot fijo como hoy — el desbloqueo pasaría a
+ser "por slot", no "por habilidad específica" como el `dash_unlocked` de
+hoy); que el servidor valide la selección (hoy no lo hace: cualquier
+jugador puede usar cualquier habilidad más allá de lo que haya elegido
+en el menú); y el flujo previo a la partida imaginado: cola competitiva
+→ se encuentra un rival → se elige/vetea el mapa → cada jugador elige
 personaje (por ahora solo estético) → cada jugador elige sus 2
-habilidades y en qué slot va cada una. Esto es un feature del tamaño de
-"Partidas" (matchmaking, veto de mapa, selección) — no se construye de
-una, queda como diseño de referencia para cuando se aborde esa fase.
+habilidades y en qué slot va cada una. Esto último es un feature del
+tamaño de "Partidas" (matchmaking, veto de mapa, selección) — no se
+construye de una, queda como diseño de referencia para cuando se aborde
+esa fase.
 
 **Feedback visual de habilidades — pendiente:** hoy es difícil notar si
 una habilidad se activó (Dash es obvio porque se ve al personaje

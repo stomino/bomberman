@@ -4,8 +4,13 @@ extends Node2D
 ## Pasa el mapa elegido a la siguiente escena vía metadata del root del
 ## árbol — no amerita un autoload solo para este dato puntual.
 
+const ABILITY_NAMES := ["speed", "dash", "flash"]
+const ABILITY_LABELS := ["Velocidad", "Dash", "Flash"]
+
 var _maps_option: OptionButton
 var _ip_input: LineEdit
+var _ability_slot_1_option: OptionButton
+var _ability_slot_2_option: OptionButton
 
 
 func _ready() -> void:
@@ -52,6 +57,29 @@ func _build_ui(connection_error: String) -> void:
 		_maps_option.add_item(file_name)
 	map_row.add_child(_maps_option)
 
+	var ability_row := HBoxContainer.new()
+	vbox.add_child(ability_row)
+
+	var ability_slot_1_label := Label.new()
+	ability_slot_1_label.text = "Habilidad 1 (Q):"
+	ability_row.add_child(ability_slot_1_label)
+
+	_ability_slot_1_option = OptionButton.new()
+	for label in ABILITY_LABELS:
+		_ability_slot_1_option.add_item(label)
+	_ability_slot_1_option.selected = 0  # Velocidad, mismo default que hoy
+	ability_row.add_child(_ability_slot_1_option)
+
+	var ability_slot_2_label := Label.new()
+	ability_slot_2_label.text = "Habilidad 2 (E):"
+	ability_row.add_child(ability_slot_2_label)
+
+	_ability_slot_2_option = OptionButton.new()
+	for label in ABILITY_LABELS:
+		_ability_slot_2_option.add_item(label)
+	_ability_slot_2_option.selected = 1  # Dash, mismo default que hoy
+	ability_row.add_child(_ability_slot_2_option)
+
 	var sandbox_button := Button.new()
 	sandbox_button.text = "Jugar (Sandbox)"
 	sandbox_button.pressed.connect(_on_sandbox_pressed)
@@ -91,6 +119,18 @@ func _build_ui(connection_error: String) -> void:
 	client_row.add_child(client_button)
 
 
+func _ability_slot_key(index: int) -> String:
+	return ABILITY_NAMES[index]
+
+
+func _apply_ability_slot_selection() -> void:
+	"""Solo hace falta en los caminos donde el jugador local realmente usa
+	teclado (Sandbox, Cliente) — el servidor no tiene input propio ni
+	Presentation, ver docs/architecture/Implementation_Decisions.md."""
+	get_tree().root.set_meta("ability_slot_1", _ability_slot_key(_ability_slot_1_option.selected))
+	get_tree().root.set_meta("ability_slot_2", _ability_slot_key(_ability_slot_2_option.selected))
+
+
 func _on_sandbox_pressed() -> void:
 	if _maps_option.selected > 0:
 		var file_name := _maps_option.get_item_text(_maps_option.selected)
@@ -98,6 +138,7 @@ func _on_sandbox_pressed() -> void:
 	else:
 		get_tree().root.set_meta("selected_map_path", "")
 
+	_apply_ability_slot_selection()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 
@@ -118,4 +159,5 @@ func _on_server_pressed() -> void:
 func _on_client_pressed() -> void:
 	var ip := _ip_input.text.strip_edges()
 	get_tree().root.set_meta("server_ip", ip if ip != "" else "127.0.0.1")
+	_apply_ability_slot_selection()
 	get_tree().change_scene_to_file("res://scenes/client.tscn")

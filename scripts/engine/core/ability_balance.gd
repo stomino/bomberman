@@ -3,12 +3,11 @@ extends RefCounted
 
 ## Cuánto vale cada habilidad, separado a propósito de GameBalance —
 ## mismo criterio que PowerUpBalance (ver
-## docs/architecture/Implementation_Decisions.md). Primera pasada: loadout
-## fijo para todos los jugadores (Velocidad en Q, Dash en E); "quién
-## tiene esta habilidad" todavía no es un dato de Player, así que estos
-## valores aplican igual para todos. Todo lo que se pueda balancear de
-## una habilidad (cooldowns, duraciones, alcances) va acá, no hardcodeado
-## en PlayerSystem — un solo lugar para ajustar todo.
+## docs/architecture/Implementation_Decisions.md). Los valores acá aplican
+## igual para todos los jugadores sea cual sea la habilidad que elijan en
+## cada slot (Q/E, ver GameRoot.try_ability_slot) — todo lo que se pueda
+## balancear de una habilidad (cooldowns, duraciones, alcances) va acá, no
+## hardcodeado en PlayerSystem — un solo lugar para ajustar todo.
 
 const DEFAULT_CONFIG_PATH := "res://config/ability_balance.json"
 
@@ -18,6 +17,9 @@ var speed_boost_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 
 var dash_unlock_ticks: int = 1800  # 30s a 60 ticks/seg
 var dash_range: int = 3  # celdas que cubre el dash (1 = un paso normal)
+
+var flash_range: int = 4  # celdas que cubre el flash, sin validar el camino intermedio
+var flash_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 
 
 static func load_from_file(path: String = DEFAULT_CONFIG_PATH) -> AbilityBalance:
@@ -61,3 +63,8 @@ func _apply_config(data: Dictionary) -> void:
 		var d = data["dash"]
 		if d.has("unlock_ticks"): dash_unlock_ticks = d["unlock_ticks"]
 		if d.has("range"): dash_range = d["range"]
+
+	if data.has("flash"):
+		var f = data["flash"]
+		if f.has("range"): flash_range = f["range"]
+		if f.has("cooldown_ticks"): flash_cooldown_ticks = f["cooldown_ticks"]

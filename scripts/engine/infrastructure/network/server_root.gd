@@ -223,6 +223,12 @@ func submit_speed_boost() -> void:
 	game_manager.queue_command(SpeedBoostCommand.new(sender_id))
 
 
+@rpc("any_peer", "call_remote", "reliable")
+func submit_flash() -> void:
+	var sender_id := multiplayer.get_remote_sender_id()
+	game_manager.queue_command(FlashCommand.new(sender_id))
+
+
 # ============================================
 # Stub vacío: Godot solo rutea un RPC si el nodo receptor existe en el
 # MISMO NodePath en ambos peers y declara el método con la MISMA

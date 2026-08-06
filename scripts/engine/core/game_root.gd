@@ -153,6 +153,35 @@ func try_speed_boost() -> void:
 	game_manager.queue_command(SpeedBoostCommand.new(LOCAL_PLAYER_ID))
 
 
+func try_flash() -> void:
+	game_manager.queue_command(FlashCommand.new(LOCAL_PLAYER_ID))
+
+
+func try_ability_slot(slot: int) -> void:
+	"""Resuelve qué habilidad dispara la tecla de este slot (elegida en el
+	menú principal, ver main_menu.gd) y llama al try_* correspondiente. No
+	hace falta overridear esto en ClientRoot: internamente llama a
+	try_dash/try_speed_boost/try_flash, que ClientRoot sí overridea para
+	mandar RPC en vez de encolar local — un solo lugar resuelve el slot
+	tanto para sandbox como para red."""
+	match _selected_ability_for_slot(slot):
+		"dash":
+			try_dash()
+		"flash":
+			try_flash()
+		_:
+			try_speed_boost()
+
+
+func _selected_ability_for_slot(slot: int) -> String:
+	var meta_key := "ability_slot_1" if slot == 1 else "ability_slot_2"
+	var default_ability := "speed" if slot == 1 else "dash"
+	var root := get_tree().root
+	if root.has_meta(meta_key):
+		return root.get_meta(meta_key)
+	return default_ability
+
+
 func is_player_alive(player_id: int) -> bool:
 	var player := player_system.get_player(player_id)
 	return player != null and player.alive

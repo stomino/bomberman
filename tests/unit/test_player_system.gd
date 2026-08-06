@@ -355,6 +355,100 @@ func test_dash_range_is_configurable_and_checks_the_whole_path() -> void:
 	assert_false(system.try_dash(0), "debería bloquearse por una celda bloqueada en el medio del camino, no solo al inicio/fin")
 
 
+func test_flash_moves_flash_range_cells_ignoring_intermediate_obstacles() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 3
+	var map := GameMap.from_balance(balance)
+	map.set_cell(3, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda intermedia bloqueada
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_true(system.try_flash(0), "el flash debería ignorar obstáculos en el camino, solo importa la celda de aterrizaje")
+	assert_eq(player.grid_position, Vector2i(5, 2), "debería aterrizar exactamente a flash_range celdas, saltando la celda bloqueada del medio")
+
+
+func test_flash_fails_when_landing_cell_is_blocked() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 3
+	var map := GameMap.from_balance(balance)
+	map.set_cell(5, 2, GameMap.CELL_INDESTRUCTIBLE)  # celda de aterrizaje bloqueada
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_false(system.try_flash(0), "no debería activarse si la celda de aterrizaje está bloqueada")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_flash_fails_when_landing_cell_is_out_of_bounds() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 10  # mapa de 7x7: se va bien afuera
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_false(system.try_flash(0), "no debería activarse si la celda de aterrizaje cae fuera del mapa")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+
+
+func test_flash_is_instant_not_animated() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 2  # mapa de 7x7: aterriza en (4,2), lejos del borde
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_true(system.try_flash(0))
+	assert_eq(player.grid_position, Vector2i(2 + balance.abilities.flash_range, 2), "grid_position debería cambiar en el mismo tick de la llamada, sin esperar ticks de movimiento")
+	assert_false(player.is_moving, "el flash no debería dejar al jugador en estado is_moving, a diferencia de Dash")
+
+
+func test_flash_cannot_reactivate_during_cooldown() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 2  # mapa de 7x7: aterriza lejos del borde
+	balance.abilities.flash_cooldown_ticks = 5
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	assert_true(system.try_flash(0))
+	assert_false(system.try_flash(0), "no debería poder reactivarse durante el cooldown")
+
+
+func test_flash_can_reactivate_after_cooldown_expires() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 1  # mapa de 7x7: dos flashes seguidos sin salir de los límites
+	balance.abilities.flash_cooldown_ticks = 3
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+	var state := GameState.new()
+
+	assert_true(system.try_flash(0))
+
+	for i in range(3):
+		system.tick(state)
+
+	assert_true(system.try_flash(0), "debería poder reactivarse una vez que el cooldown terminó")
+
+
 func test_ability_unlock_progress_marks_dash_unlocked_at_configured_tick() -> void:
 	var balance := _make_balance()
 	balance.abilities.dash_unlock_ticks = 3

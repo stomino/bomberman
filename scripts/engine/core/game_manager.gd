@@ -66,6 +66,8 @@ func _apply_pending_commands() -> void:
 			_apply_dash(command.player_id)
 		elif command is SpeedBoostCommand:
 			_apply_speed_boost(command.player_id)
+		elif command is FlashCommand:
+			_apply_flash(command.player_id)
 
 	_pending_commands.clear()
 
@@ -94,6 +96,14 @@ func _apply_speed_boost(player_id: int) -> void:
 		return
 
 	player_system.try_activate_speed_boost(player_id)
+
+
+func _apply_flash(player_id: int) -> void:
+	var player := player_system.get_player(player_id)
+	if player == null or not player.alive:
+		return
+
+	player_system.try_flash(player_id)
 
 
 func _resolve_powerup_pickups() -> void:
