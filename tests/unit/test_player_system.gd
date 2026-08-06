@@ -94,7 +94,50 @@ func test_player_cannot_move_into_wall() -> void:
 	assert_eq(player.facing_direction, Vector2i.UP, "debería quedar mirando hacia la pared igual")
 
 
-func test_player_cannot_move_into_bomb_cell() -> void:
+func test_player_pushes_bomb_when_walking_into_it() -> void:
+	"""Empujar bombas (ver docs/architecture/Implementation_Decisions.md):
+	caminar contra una bomba ya no bloquea sin más — la empuja una celda
+	en la misma dirección, si esa celda está libre. Jugador y bomba se
+	mueven en sincronía, misma cantidad de ticks que un paso normal."""
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	bombs.place_bomb(Vector2i(3, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)
+	bombs.bombs[0].timer = 100  # que no explote a mitad del empuje (bomb_timer_base_ticks=3 en _make_balance)
+
+	system.set_move_direction(0, Vector2i.RIGHT)
+
+	# tick_rate=60, speed=6.0 -> 10 ticks exactos por celda
+	for i in range(10):
+		system.tick(state)
+		bombs.tick(state)
+
+	assert_eq(player.grid_position, Vector2i(3, 2), "el jugador debería haber avanzado a la celda que ocupaba la bomba")
+	assert_eq(bombs.bombs[0].grid_pos, Vector2i(4, 2), "la bomba debería haberse desplazado una celda en la misma dirección")
+
+
+func test_push_fails_when_bomb_would_hit_wall() -> void:
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(4, 2), balance)
+	system.add_player(player)
+
+	bombs.place_bomb(Vector2i(5, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)  # mapa 7x7: borde en x=6
+
+	system.set_move_direction(0, Vector2i.RIGHT)
+
+	assert_false(player.is_moving, "no debería empezar a moverse: empujar la bomba contra la pared falla")
+	assert_eq(bombs.bombs[0].grid_pos, Vector2i(5, 2), "la bomba no debería haberse movido")
+
+
+func test_push_fails_when_bomb_would_hit_another_bomb() -> void:
 	var balance := _make_balance()
 	var map := GameMap.from_balance(balance)
 	var bombs := BombSystem.new(map, balance)
@@ -103,10 +146,48 @@ func test_player_cannot_move_into_bomb_cell() -> void:
 	system.add_player(player)
 
 	bombs.place_bomb(Vector2i(3, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)
+	bombs.place_bomb(Vector2i(4, 2), 2, balance.get_bomb_range(), balance.max_bombs_per_player)  # dueño distinto, no pisa el límite de bombas del jugador 1
 
 	system.set_move_direction(0, Vector2i.RIGHT)
 
-	assert_false(player.is_moving, "no debería poder caminar sobre una celda con bomba")
+	assert_false(player.is_moving, "no debería empezar a moverse: la bomba empujada chocaría con otra bomba")
+	assert_eq(bombs.bombs[0].grid_pos, Vector2i(3, 2))
+	assert_eq(bombs.bombs[1].grid_pos, Vector2i(4, 2))
+
+
+func test_dash_does_not_push_bombs() -> void:
+	var balance := _make_balance()
+	balance.abilities.dash_range = 2
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	player.dash_unlocked = true
+	system.add_player(player)
+
+	bombs.place_bomb(Vector2i(4, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)  # celda destino del dash
+
+	assert_false(system.try_dash(0), "el dash no debería empujar bombas, solo fallar como con cualquier obstáculo")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+	assert_eq(bombs.bombs[0].grid_pos, Vector2i(4, 2), "la bomba no debería haberse movido")
+
+
+func test_flash_does_not_push_bombs() -> void:
+	var balance := _make_balance()
+	balance.abilities.flash_range = 2
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	player.facing_direction = Vector2i.RIGHT
+	system.add_player(player)
+
+	bombs.place_bomb(Vector2i(4, 2), 1, balance.get_bomb_range(), balance.max_bombs_per_player)  # celda de aterrizaje
+
+	assert_false(system.try_flash(0), "el flash no debería empujar bombas, solo fallar si la celda de aterrizaje está ocupada")
+	assert_eq(player.grid_position, Vector2i(2, 2))
+	assert_eq(bombs.bombs[0].grid_pos, Vector2i(4, 2))
 
 
 func test_player_dies_when_standing_in_explosion() -> void:

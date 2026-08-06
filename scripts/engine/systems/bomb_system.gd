@@ -127,8 +127,24 @@ func place_bomb(grid_pos: Vector2i, owner_id: int, bomb_range: int, max_bombs_fo
 
 
 func tick(_state: GameState) -> void:
+	_tick_bomb_movement()
 	_tick_bombs()
 	_tick_explosions()
+
+
+func _tick_bomb_movement() -> void:
+	"""Solo avanza la animación del deslizamiento — grid_pos ya se
+	actualizó al instante en try_push_bomb (ver ahí el porqué). Esto es
+	puro estado cosmético para que game_renderer.gd pueda interpolar."""
+	for bomb in bombs:
+		if not bomb.is_moving:
+			continue
+
+		bomb.move_ticks_elapsed += 1
+
+		if bomb.move_ticks_elapsed >= bomb.move_ticks_total:
+			bomb.is_moving = false
+			bomb.move_direction = Vector2i.ZERO
 
 
 func _tick_bombs() -> void:
@@ -228,6 +244,55 @@ func is_cell_occupied_by_bomb(pos: Vector2i) -> bool:
 		if bomb.grid_pos == pos and bomb.active:
 			return true
 	return false
+
+
+func get_bomb_at(pos: Vector2i) -> Bomb:
+	for bomb in bombs:
+		if bomb.grid_pos == pos and bomb.active:
+			return bomb
+	return null
+
+
+func try_push_bomb(bomb: Bomb, direction: Vector2i, ticks_total: int) -> bool:
+	"""Empujar bombas (ver docs/architecture/Implementation_Decisions.md):
+	a diferencia del movimiento del jugador, grid_pos se actualiza al
+	instante acá, no al completar el deslizamiento — es la posición
+	lógica (choques, celda ocupada, cadenas de explosión) la que manda,
+	determinística en el mismo tick en que se decide el empuje. Los
+	campos move_* que arranca esto son puramente cosméticos, para que
+	game_renderer.gd interpole el deslizamiento visual desde la celda
+	vieja hacia grid_pos (que ya es la nueva).
+
+	Por qué no puede ser lazy como el jugador: jugador y bomba avanzan
+	juntos, la misma cantidad de ticks, pero PlayerSystem.tick() y
+	BombSystem.tick() se llaman por separado desde GameManager — si
+	grid_pos de la bomba solo se actualizara al completar su propio
+	tick, el re-chequeo de _is_cell_free que hace el jugador al llegar
+	vería la celda todavía "ocupada" un tick de más (orden de llamada
+	entre los dos tick()), y el jugador se frenaría a último momento
+	pese a que el empuje ya se había validado y comprometido al
+	arrancar. Al ser eager, no hay ninguna ventana de inconsistencia
+	posible entre las dos entidades.
+
+	Falla fail-fast, sin mover nada, si la bomba ya se está deslizando o
+	si la celda destino no es caminable o ya tiene otra bomba."""
+	if bomb.is_moving:
+		return false
+
+	var target := bomb.grid_pos + direction
+
+	if not game_map.is_walkable(target.x, target.y):
+		return false
+
+	if is_cell_occupied_by_bomb(target):
+		return false
+
+	bomb.grid_pos = target
+	bomb.move_direction = direction
+	bomb.move_ticks_total = ticks_total
+	bomb.move_ticks_elapsed = 0
+	bomb.is_moving = true
+	return true
 
 
 func get_bombs_by_player(player_id: int) -> Array[Bomb]:

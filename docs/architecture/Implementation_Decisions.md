@@ -989,6 +989,104 @@ por sí sola si el caché ya existía de una corrida anterior. No es un bug
 de código, es un artefacto de caché local — se resuelve solo con que el
 editor (o una build fresca) rescanee el proyecto.
 
+## Empujar bombas: último ítem del backlog de Habilidades
+
+**Decisión:** caminar contra una bomba ya no bloquea sin más — la
+empuja una celda en la misma dirección, si esa celda está libre. Cinco
+decisiones de diseño, confirmadas con el dueño del producto:
+
+1. **Solo movimiento normal empuja.** Dash y Flash no cambian — si
+   terminan sobre una celda con bomba, siguen fallando exactamente como
+   antes. Son habilidades con sus propias reglas de colisión ya
+   probadas; no se tocan (`try_dash`/`try_flash` no pasan por
+   `_try_start_move`, que es el único call site que cambió).
+2. **Se desliza animado**, no teletransporta — mismo "feel" que el paso
+   normal del jugador.
+3. **Colisión:** si la celda destino del empuje no es caminable o ya
+   tiene otra bomba, el empuje falla y el jugador tampoco se mueve —
+   mismo fail-fast que contra una pared. Colisión contra otro jugador no
+   aplica: el motor nunca bloqueó movimiento por posición de otro
+   jugador (confirmado auditando `_is_cell_free` antes de este cambio —
+   solo chequeaba pared y bomba), así que una bomba empujada hacia la
+   celda de un jugador simplemente coexiste, igual que ya coexisten hoy
+   jugadores y powerups. No se introdujo colisión jugador-jugador nueva
+   para esto.
+4. Cualquier bomba es empujable, propia o de un rival.
+5. Duración del empuje = la misma cantidad de ticks que le toma al
+   jugador cruzar esa celda (`_ticks_for_speed(get_effective_speed(player))`)
+   — bomba y jugador se mueven en sincronía, sin agregar un balance
+   nuevo de "velocidad de empuje".
+
+**`Bomb`** gana `move_direction`/`move_ticks_total`/`move_ticks_elapsed`/
+`is_moving` — mismo patrón que `Player`, más `get_move_progress()`
+(vive en `Bomb`, no en `BombSystem`, porque `Bomb` ya es dueño de su
+propia lógica de tick — `tick_update()` — a diferencia de `Player`, que
+es puro dato).
+
+**`BombSystem`** gana `get_bomb_at(cell)` (scan lineal, mismo patrón que
+`is_cell_occupied_by_bomb`) y `try_push_bomb(bomb, direction, ticks_total)`.
+`tick()` gana `_tick_bomb_movement()` como primer paso.
+
+**Hallazgo real durante la implementación — por qué `grid_pos` se
+actualiza al instante en `try_push_bomb`, no al completar el
+deslizamiento (a diferencia de `Player.grid_position`, que sí es
+lazy):** la primera versión mirror exacto de `Player` (mover `grid_pos`
+recién en `_tick_bomb_movement`, al llegar a `move_ticks_total`) falló un
+test real (`test_player_pushes_bomb_when_walking_into_it`): el jugador se
+frenaba a último momento, pese a que el empuje ya se había validado y
+comprometido al arrancar. Causa: `GameManager.tick()` llama
+`player_system.tick(state)` y `bomb_system.tick(state)` por separado —
+en el tick en que el jugador completa su movimiento y `_update_player`
+re-valida `_is_cell_free(next_cell)` (re-chequeo de llegada, sin cambios,
+ver más abajo), la bomba todavía no había corrido su propio
+`_tick_bomb_movement()` de ese mismo tick (corre después, en la llamada
+siguiente), así que seguía reportando `grid_pos` en la celda vieja —
+el jugador se veía bloqueado por una bomba que en la práctica ya se
+había ido. La solución: `try_push_bomb` actualiza `grid_pos` al instante
+al comprometerse el empuje (nada puede interrumpirlo después de
+empezado); los campos `move_*` quedan puramente cosméticos, solo para
+que `game_renderer.gd` interpole el deslizamiento visual desde la celda
+vieja hacia `grid_pos` (que ya es la nueva) — `_draw_bombs()` calcula el
+offset como `-move_direction * (1 - progress) * cell_size` en vez de
+`+move_direction * progress * cell_size` que usa `Player`, justamente
+porque acá `grid_pos` es el destino, no el origen. Con esto, no hay
+ninguna ventana de inconsistencia posible entre jugador y bomba sin
+importar el orden de los `tick()`.
+
+**`PlayerSystem._try_start_move`** — único call site que cambió: si la
+celda destino no es caminable, falla igual que siempre; si tiene una
+bomba, busca la bomba (`get_bomb_at`) e intenta empujarla
+(`try_push_bomb`) antes de fallar. Como vive acá y no en
+`_update_player`, empujar también funciona para movimiento encadenado
+(sostener la tecla y cruzar varias bombas seguidas) sin tocar ese
+código — `_update_player` ya vuelve a llamar `_try_start_move` para cada
+celda nueva vía `next_direction`. El re-chequeo de llegada que ya hacía
+`_update_player` (`_is_cell_free` al completar una celda) se deja sin
+cambios a propósito: el empuje se resuelve una sola vez, al arrancar el
+movimiento, no se reintenta en la llegada.
+
+`snapshot_codec.gd` suma los 4 campos nuevos de `Bomb` al dict
+serializado/deserializado, mismo patrón que los campos de movimiento de
+`Player`.
+
+**Probado:** 87/87 tests (empuje exitoso con jugador y bomba
+sincronizados, empuje bloqueado por pared, empuje bloqueado por otra
+bomba, confirmación de que Dash y Flash no empujan). El
+round-trip de `snapshot_codec.gd` se extendió para cubrir explícitamente
+una bomba **a mitad de empuje** (`is_moving=true`, `move_ticks_elapsed`
+parcial), no solo el caso estático — mismo criterio que ya cubría
+`Player.move_direction` a mitad de paso. Verificado en vivo en Sandbox
+real (script temporal, descartado después de confirmar) sosteniendo la
+tecla de movimiento contra una bomba: empujó, y al seguir sosteniendo la
+tecla encadenó varios empujes seguidos (la bomba terminó 2 celdas
+adelante del jugador tras 4 empujes consecutivos) — confirmado con
+capturas de pantalla reales mostrando el deslizamiento. No se repitió la
+verificación en vivo por red (servidor+cliente reales): el mecanismo de
+red para el nuevo estado de `Bomb` es idéntico en tipo al que ya mueve
+`Player.move_direction` por snapshot desde Fase 4, y quedó cubierto por
+el test de round-trip con bomba a mitad de empuje — repetir la
+automatización de dos procesos no agregaba señal nueva.
+
 ## Composition root: GameRoot inyecta hacia Presentation por código, no por escena
 
 **Decisión:** `player_node.gd` no usa `@export var game_root: GameRoot`

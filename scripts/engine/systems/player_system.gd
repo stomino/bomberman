@@ -109,12 +109,17 @@ func _ticks_for_speed(speed: float) -> int:
 
 func _try_start_move(player: Player, direction: Vector2i) -> void:
 	"""Arranca el movimiento hacia direction solo si la celda destino es
-	caminable y no tiene una bomba. Si no lo es, el jugador queda quieto
-	mirando hacia esa dirección (facing_direction ya se seteó antes de
-	llamar a esto)."""
+	caminable. Si tiene una bomba, intenta empujarla (ver
+	docs/architecture/Implementation_Decisions.md) en vez de bloquear
+	directo — solo el movimiento normal empuja, Dash/Flash no pasan por
+	acá y mantienen su comportamiento de siempre. Si la celda no es
+	caminable, o tiene una bomba que no se pudo empujar, el jugador queda
+	quieto mirando hacia esa dirección (facing_direction ya se seteó antes
+	de llamar a esto)."""
 	var target := player.grid_position + direction
+	var ticks_total := _ticks_for_speed(get_effective_speed(player))
 
-	if not _is_cell_free(target):
+	if not game_map.is_walkable(target.x, target.y):
 		player.move_direction = Vector2i.ZERO
 		player.next_direction = Vector2i.ZERO
 		player.move_ticks_elapsed = 0
@@ -122,10 +127,20 @@ func _try_start_move(player: Player, direction: Vector2i) -> void:
 		player.has_pending_move = false
 		return
 
+	if bomb_system.is_cell_occupied_by_bomb(target):
+		var bomb := bomb_system.get_bomb_at(target)
+		if bomb == null or not bomb_system.try_push_bomb(bomb, direction, ticks_total):
+			player.move_direction = Vector2i.ZERO
+			player.next_direction = Vector2i.ZERO
+			player.move_ticks_elapsed = 0
+			player.is_moving = false
+			player.has_pending_move = false
+			return
+
 	player.move_direction = direction
 	player.next_direction = Vector2i.ZERO
 	player.move_ticks_elapsed = 0
-	player.move_ticks_total = _ticks_for_speed(get_effective_speed(player))
+	player.move_ticks_total = ticks_total
 	player.move_distance_cells = 1
 	player.is_moving = true
 	player.has_pending_move = true

@@ -239,20 +239,31 @@ mapa específico o procedural).
 
 ### Habilidades (loadout pre-partida)
 
-✅ **Segunda pasada hecha:** tres habilidades — Velocidad (ráfaga con
-cooldown), Dash (alcance configurable, desbloqueo por tiempo — hoy
-neutralizado a 0 para pruebas), Flash (teletransporte instantáneo que
-ignora obstáculos intermedios, solo cooldown). El menú principal deja
-elegir qué habilidad va en cada slot (**Q**/**E**) de las 3 — ya no es un
-loadout fijo en código, aunque todavía sin restricción real de "solo 2
-de N" (el servidor no valida la selección, cualquier jugador puede usar
-cualquier habilidad — ver más abajo). Todo lo balanceable de cada
-habilidad (bonus, duración, cooldown, alcance, tiempo de desbloqueo)
-vive en `config/ability_balance.json`, no hardcodeado — un solo lugar
-para ajustar números. Ver `docs/architecture/Implementation_Decisions.md`.
-Sigue pendiente: Empujar bombas, selección real de loadout (con
-validación server-side), objetivos de desbloqueo por ubicación/
-estructura.
+✅ **Segunda pasada hecha:** tres habilidades activas — Velocidad
+(ráfaga con cooldown), Dash (alcance configurable, desbloqueo por
+tiempo — hoy neutralizado a 0 para pruebas), Flash (teletransporte
+instantáneo que ignora obstáculos intermedios, solo cooldown). El menú
+principal deja elegir qué habilidad va en cada slot (**Q**/**E**) de las
+3 — ya no es un loadout fijo en código, aunque todavía sin restricción
+real de "solo 2 de N" (el servidor no valida la selección, cualquier
+jugador puede usar cualquier habilidad — ver más abajo). Todo lo
+balanceable de cada habilidad (bonus, duración, cooldown, alcance,
+tiempo de desbloqueo) vive en `config/ability_balance.json`, no
+hardcodeado — un solo lugar para ajustar números.
+
+✅ **Empujar bombas hecho** — a diferencia de las tres de arriba, no es
+una habilidad de slot Q/E: es un cambio al movimiento normal en sí.
+Caminar contra una bomba ya no bloquea, la empuja una celda (se desliza
+animado, misma velocidad que el paso del jugador) si la celda destino
+está libre; si no, falla igual que contra una pared. Dash/Flash no
+empujan (mantienen sus propias reglas de colisión). Ver
+`docs/architecture/Implementation_Decisions.md` para el detalle de las 5
+decisiones de diseño y un hallazgo real de sincronización entre
+`PlayerSystem`/`BombSystem` que hizo falta resolver.
+
+Con esto se cierra el backlog original de Habilidades. Sigue pendiente
+solo la selección real de loadout (con validación server-side) y
+objetivos de desbloqueo por ubicación/estructura — ver más abajo.
 
 **Diseño del sistema de slots — versión de pruebas hecha, versión real
 pendiente:** cada jugador tiene 2 slots de habilidad — **Q** (slot 1) y

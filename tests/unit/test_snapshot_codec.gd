@@ -53,7 +53,15 @@ func before_each() -> void:
 	source_players.add_player(player)
 
 	var explosion_cells: Array[Vector2i] = [Vector2i(1, 1), Vector2i(1, 2)]
-	source_bombs.bombs.append(Bomb.new(Vector2i(2, 2), 7, balance, 3))
+	var bomb := Bomb.new(Vector2i(2, 2), 7, balance, 3)
+	# Empujar bombas: mid-empuje, mismo patrón que el jugador de arriba —
+	# confirma que el round-trip también reproduce una bomba a mitad de
+	# deslizamiento, no solo el caso estático.
+	bomb.move_direction = Vector2i.DOWN
+	bomb.move_ticks_total = 10
+	bomb.move_ticks_elapsed = 6
+	bomb.is_moving = true
+	source_bombs.bombs.append(bomb)
 	source_bombs.explosions.append(Explosion.new(explosion_cells, balance))
 	source_powerups.powerups.append(PowerUp.new(Vector2i(4, 4), PowerUp.Type.SHIELD))
 
@@ -98,6 +106,10 @@ func test_round_trip_reproduces_bombs_explosions_and_powerups() -> void:
 	assert_eq(target_bombs.bombs[0].grid_pos, Vector2i(2, 2))
 	assert_eq(target_bombs.bombs[0].owner_id, 7)
 	assert_eq(target_bombs.bombs[0].range, 3)
+	assert_eq(target_bombs.bombs[0].move_direction, Vector2i.DOWN)
+	assert_eq(target_bombs.bombs[0].move_ticks_total, 10)
+	assert_eq(target_bombs.bombs[0].move_ticks_elapsed, 6)
+	assert_eq(target_bombs.bombs[0].is_moving, true)
 
 	assert_eq(target_bombs.explosions.size(), 1)
 	assert_eq(target_bombs.explosions[0].cells, [Vector2i(1, 1), Vector2i(1, 2)] as Array[Vector2i])

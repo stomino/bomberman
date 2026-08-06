@@ -31,6 +31,10 @@ static func serialize(state: GameState, player_system: PlayerSystem, bomb_system
 			"owner_id": bomb.owner_id,
 			"timer": bomb.timer,
 			"range": bomb.range,
+			"move_direction": bomb.move_direction,
+			"move_ticks_total": bomb.move_ticks_total,
+			"move_ticks_elapsed": bomb.move_ticks_elapsed,
+			"is_moving": bomb.is_moving,
 		})
 
 	var explosions_data: Array = []
@@ -108,6 +112,10 @@ static func _apply_bombs(bombs_data: Array, bomb_system: BombSystem) -> void:
 	for bdata in bombs_data:
 		var bomb := Bomb.new(bdata["grid_pos"], bdata["owner_id"], bomb_system.balance, bdata["range"])
 		bomb.timer = bdata["timer"]
+		bomb.move_direction = bdata["move_direction"]
+		bomb.move_ticks_total = bdata["move_ticks_total"]
+		bomb.move_ticks_elapsed = bdata["move_ticks_elapsed"]
+		bomb.is_moving = bdata["is_moving"]
 		bombs.append(bomb)
 	bomb_system.bombs = bombs
 
