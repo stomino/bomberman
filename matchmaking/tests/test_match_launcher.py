@@ -63,3 +63,32 @@ def test_launch_match_builds_expected_command(mock_popen):
             "--port=9005",
         ]
     )
+
+
+@patch("matchmaking.match_launcher.subprocess.Popen")
+def test_reap_finished_matches_releases_port_of_exited_process(mock_popen):
+    # poll() devuelve un exit code (no None) cuando el proceso ya terminó
+    # -- ServerRoot cierra su propio proceso al terminar la partida, ver
+    # docs/architecture/Implementation_Decisions.md.
+    mock_popen.return_value = MagicMock(poll=MagicMock(return_value=0))
+    launcher = _make_launcher(start=9000, end=9000)
+    port = launcher.allocate_port()
+    launcher.launch_match(port)
+
+    launcher.reap_finished_matches()
+
+    assert launcher.allocate_port() == port, "el puerto debería estar libre de nuevo"
+
+
+@patch("matchmaking.match_launcher.subprocess.Popen")
+def test_reap_finished_matches_keeps_port_of_still_running_process(mock_popen):
+    # poll() devuelve None mientras el proceso sigue vivo.
+    mock_popen.return_value = MagicMock(poll=MagicMock(return_value=None))
+    launcher = _make_launcher(start=9000, end=9000)
+    port = launcher.allocate_port()
+    launcher.launch_match(port)
+
+    launcher.reap_finished_matches()
+
+    with pytest.raises(NoPortsAvailableError):
+        launcher.allocate_port()

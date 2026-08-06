@@ -14,6 +14,7 @@ extends GameRoot
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
 var _player_nodes: Dictionary = {}  # player_id -> Node, ver _sync_player_nodes()
+var _was_running: bool = false  # ver receive_snapshot() / _on_match_ended()
 
 
 func _ready() -> void:
@@ -128,6 +129,32 @@ func _fail_and_return_to_menu(message: String) -> void:
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
+func _on_match_ended() -> void:
+	"""GameManager.state.running pasó de true a false (ver receive_snapshot):
+	la partida terminó normalmente, no es una desconexión — mensaje y
+	meta propios (match_result_message, no connection_error) para que el
+	menú lo muestre distinto (no como un error). Mismo cierre de peer que
+	_fail_and_return_to_menu, sin reusar esa función porque el mensaje no
+	es un fallo."""
+	var message := _match_result_message()
+	GameLogger.info(message, "ClientRoot")
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.close()
+		multiplayer.multiplayer_peer = null
+	get_tree().root.set_meta("match_result_message", message)
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _match_result_message() -> String:
+	var winner_id: int = game_manager.state.winner_id
+	if winner_id == -1:
+		return "Partida terminada: empate."
+	elif winner_id == LOCAL_PLAYER_ID:
+		return "¡Ganaste la partida!"
+	else:
+		return "Partida terminada. Ganó el otro jugador."
+
+
 # ============================================
 # API PARA PRESENTATION: acá el input no se aplica localmente, viaja al
 # servidor por RPC — el servidor es el único que decide si es válido.
@@ -180,6 +207,11 @@ func receive_snapshot(data: Dictionary) -> void:
 	SnapshotCodec.apply(data, game_manager.state, player_system, bomb_system, powerup_system, game_map)
 	_apply_map_zoom()
 	_sync_player_nodes()
+
+	if _was_running and not game_manager.state.running:
+		_on_match_ended()
+		return
+	_was_running = game_manager.state.running
 
 
 # ============================================

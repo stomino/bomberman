@@ -8,6 +8,7 @@ extends Node
 ## nodos de Presentation que inyectar — el servidor no dibuja nada.
 
 const DEFAULT_PORT := 8910
+const MATCH_END_MAX_WAIT_SECONDS := 8.0
 
 var balance: GameBalance
 var game_map: GameMap
@@ -21,6 +22,8 @@ var _next_spawn_index: int = 0
 var _status_label: Label
 var _is_headless: bool = false
 var _port: int = DEFAULT_PORT
+var _match_ending: bool = false
+var _quitting: bool = false
 
 
 func _ready() -> void:
@@ -36,6 +39,7 @@ func _ready() -> void:
 	_connect_bomb_signals()
 	_build_status_ui()
 	_start_server()
+	game_manager.match_ended.connect(_on_match_ended)
 	game_manager.start_match()
 
 
@@ -90,6 +94,43 @@ func _connect_bomb_signals() -> void:
 	bomb_system.block_destroyed.connect(powerup_system.maybe_spawn_from_destroyed_block)
 
 
+func _on_match_ended(winner_id: int) -> void:
+	"""Cierra el proceso del servidor solo (ver
+	docs/architecture/Implementation_Decisions.md) — matchmaking (Fase 7)
+	lanza un ServerRoot nuevo por partida y necesita que el proceso
+	efectivamente termine para poder liberar su puerto.
+
+	No cierra con un timer fijo corto: probado en vivo que un margen fijo
+	de 3s no siempre alcanza (un cliente real llegó a quedarse afuera de
+	la ventana y vio "se perdió la conexión" en vez del mensaje de fin de
+	partida — condición de carrera real, no de laboratorio). En cambio,
+	espera a que los clientes se vayan solos: cada uno recibe
+	state.running=false en el snapshot (ya viaja sin cambios), cierra su
+	propio peer (ClientRoot._on_match_ended) y eso dispara
+	_on_peer_disconnected acá — cuando ya no queda ninguno registrado,
+	cierra al toque, sin esperar nada de tiempo fijo. MATCH_END_MAX_WAIT_SECONDS
+	es solo la red de seguridad, para el caso de que algún cliente no se
+	vaya solo (crash, etc.)."""
+	_match_ending = true
+	var message := "Partida terminada. Ganador: %d — esperando que los clientes se desconecten (máx %.0fs)" % [winner_id, MATCH_END_MAX_WAIT_SECONDS]
+	GameLogger.info(message, "ServerRoot")
+	if _is_headless:
+		print("[ServerRoot] " + message)
+
+	await get_tree().create_timer(MATCH_END_MAX_WAIT_SECONDS).timeout
+	_quit_server("tiempo máximo alcanzado, algún cliente no se desconectó solo")
+
+
+func _quit_server(reason: String) -> void:
+	if _quitting:
+		return
+	_quitting = true
+	GameLogger.info("Cerrando servidor: " + reason, "ServerRoot")
+	if _is_headless:
+		print("[ServerRoot] Cerrando servidor: " + reason)
+	get_tree().quit()
+
+
 func _start_server() -> void:
 	var peer := ENetMultiplayerPeer.new()
 	# create_server() sin bind_address escucha en todas las interfaces de
@@ -132,6 +173,9 @@ func _on_peer_disconnected(id: int) -> void:
 	player_system.remove_player(id)
 	GameLogger.info("Jugador %d desconectado" % id, "ServerRoot")
 	_update_status_ui()
+
+	if _match_ending and player_system.players.is_empty():
+		_quit_server("todos los jugadores se desconectaron solos tras terminar la partida")
 
 
 func _get_lan_ip() -> String:

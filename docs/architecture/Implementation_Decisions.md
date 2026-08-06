@@ -1335,3 +1335,84 @@ partida (queda corriendo — limitación conocida), handshake real de
 "servidor listo" (espera fija en su lugar), reconexión/espectador (ya
 fuera de alcance desde Fase 6), UI para elegir la dirección del
 matchmaking (fija a `127.0.0.1` esta pasada).
+
+## Fase 7: cerrar el servidor al terminar la partida
+
+**Decisión:** cierra la limitación conocida de la entrada anterior. Hasta
+acá, `GameManager._check_match_end()` ya emitía `match_ended(winner_id)`
+(con `state.tick >= match_duration_seconds * tick_rate` y 2+ jugadores),
+pero nada la escuchaba — ni el servidor, ni el cliente (confirmado por
+grep: cero listeners en todo el proyecto). Los clientes tampoco se
+enteraban nunca de que la partida había terminado — el servidor seguía
+mandando snapshots congelados (`state.running = false`) para siempre.
+
+**Nada de esto necesitó un mensaje de red nuevo:** `state.running` y
+`state.winner_id` ya viajaban en cada snapshot sin cambios — solo hacía
+falta reaccionar. `ClientRoot` guarda si la partida estaba corriendo en
+el snapshot anterior (`_was_running`); cuando pasa de `true` a `false`,
+arma un mensaje según `state.winner_id` vs `LOCAL_PLAYER_ID` ("¡Ganaste
+la partida!" / "Partida terminada. Ganó el otro jugador." / "Partida
+terminada: empate.") y vuelve al menú — mismo cierre de peer que
+`_fail_and_return_to_menu`, pero con su **propio** meta key
+(`match_result_message`, no `connection_error`) para que
+`main_menu.gd` lo muestre en amarillo, no en rojo — un "ganaste" en rojo
+se leería como un error.
+
+**Hallazgo real durante la verificación — por qué el servidor no cierra
+con un timer fijo:** la primera versión esperaba un margen fijo de 3s
+tras `match_ended` y listo. Probado en vivo (servidor headless + 2
+clientes reales, flujo normal, sin scripts temporales), uno de los dos
+clientes terminó viendo "Se perdió la conexión con el servidor." en vez
+del mensaje de fin de partida — no llegó a procesar el snapshot con
+`running=false` dentro de esos 3s. No es un bug de lógica: es una
+carrera real entre "el servidor decide cerrar" y "el cliente todavía no
+proceso el último estado". Se corrigió con un diseño **dirigido por
+eventos en vez de por tiempo fijo**: `ServerRoot._on_match_ended()`
+marca `_match_ending = true` y arranca un timer de
+`MATCH_END_MAX_WAIT_SECONDS` (8s) como **red de seguridad únicamente**;
+`_on_peer_disconnected()` gana un chequeo — si `_match_ending` y ya no
+queda ningún jugador registrado (todos se fueron solos, cerrando su
+propio peer al ver `running=false`), cierra al toque, sin esperar nada
+de tiempo fijo. `_quit_server(reason)` centraliza el `get_tree().quit()`
+con un guard (`_quitting`) para no dispararlo dos veces si el timeout de
+seguridad también llega a disparar después de que ya cerró por el
+camino rápido.
+
+**Con el fix, la carrera se achica pero no desaparece del todo:**
+reproducido de nuevo, el cierre del proceso del servidor funcionó
+perfecto las dos veces (se confirma vía lista de procesos: el
+`ServerRoot` termina solo, siempre). Pero en la segunda corrida, un
+cliente **todavía** vio el mensaje genérico — tardó más de los 8s
+completos en procesar el snapshot final, bajo la carga real de esta
+máquina en el momento de probar (streams de video, editor, y todos los
+procesos de Godot abiertos/cerrados durante la sesión). Decisión
+explícita del dueño del producto: **documentar como límite conocido, no
+resolverlo del todo en esta pasada.** Cerrar la carrera por completo
+necesitaría un protocolo de confirmación explícita (el cliente le avisa
+al servidor "ya vi que terminó", el servidor espera esa confirmación en
+vez de inferir por la ausencia de jugadores) — más protocolo nuevo para
+un problema que hoy es puramente cosmético: el jugador siempre termina
+de vuelta en el menú de cualquier manera, lo único que cambia es qué
+mensaje ve.
+
+**`matchmaking/match_launcher.py`:** hasta acá nada liberaba los puertos
+nunca. `MatchLauncher` pasa a trackear `port -> Popen`;
+`reap_finished_matches()` (nuevo) revisa `proc.poll()` de cada uno y
+libera el puerto de los que ya terminaron — funciona gracias a que
+`ServerRoot` ahora sí cierra su propio proceso. `matchmaking/server.py`
+lo llama desde un loop periódico nuevo (`asyncio.create_task`, cada
+`REAP_INTERVAL_SECONDS` = 10s).
+
+**Probado:** 92/92 tests de Godot (sin regresión) + 13/13 pytest (agrega
+2 tests nuevos de `reap_finished_matches`, con `Popen.poll()` mockeado
+para simular proceso vivo/terminado). Verificado en vivo dos veces,
+bajando temporalmente `match_duration_seconds` a 10 (revertido después,
+mismo criterio que la instrumentación temporal de la entrada anterior)
+con servidor headless + 2 clientes reales por el flujo normal: el
+proceso del servidor terminó solo las dos veces, confirmado por captura
+de pantalla que el mensaje de fin de partida se ve bien cuando el
+cliente llega a tiempo.
+
+**Fuera de alcance (explícito):** protocolo de confirmación
+cliente→servidor (ver arriba — límite conocido, no un bug de lógica),
+cuentas/login/ranking (siguen siendo Fase 7 más grande, sin tocar acá).

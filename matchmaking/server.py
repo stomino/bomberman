@@ -66,7 +66,18 @@ async def _launch_and_notify(pair) -> None:
             logger.warning("Un jugador se desconectó antes de recibir el emparejamiento")
 
 
+async def _reap_loop() -> None:
+    """Libera los puertos de los ServerRoot que ya cerraron su propio
+    proceso al terminar la partida (ver
+    docs/architecture/Implementation_Decisions.md) — Popen.poll() no se
+    actualiza solo, hay que preguntarle cada tanto."""
+    while True:
+        await asyncio.sleep(config.REAP_INTERVAL_SECONDS)
+        _launcher.reap_finished_matches()
+
+
 async def main() -> None:
+    asyncio.create_task(_reap_loop())
     async with websockets.serve(_handle_client, config.MATCHMAKING_HOST, config.MATCHMAKING_PORT):
         logger.info(
             "Matchmaking escuchando en ws://%s:%d", config.MATCHMAKING_HOST, config.MATCHMAKING_PORT

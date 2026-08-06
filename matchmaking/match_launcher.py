@@ -9,7 +9,7 @@ matchmaking/tests/test_match_launcher.py.
 from __future__ import annotations
 
 import subprocess
-from typing import Set
+from typing import Dict, Set
 
 from . import config
 
@@ -31,6 +31,7 @@ class MatchLauncher:
         self._godot_executable = godot_executable
         self._godot_project_path = godot_project_path
         self._used_ports: Set[int] = set()
+        self._processes: Dict[int, subprocess.Popen] = {}  # port -> proceso lanzado en ese puerto
 
     def allocate_port(self) -> int:
         for port in range(self._port_range_start, self._port_range_end + 1):
@@ -59,4 +60,17 @@ class MatchLauncher:
             "--",
             f"--port={port}",
         ]
-        return subprocess.Popen(command)
+        process = subprocess.Popen(command)
+        self._processes[port] = process
+        return process
+
+    def reap_finished_matches(self) -> None:
+        """Revisa los procesos lanzados y libera el puerto de los que ya
+        terminaron (ServerRoot cierra su propio proceso al terminar la
+        partida — ver docs/architecture/Implementation_Decisions.md).
+        Hay que llamarlo periódicamente (ver server.py) — Popen.poll() no
+        se actualiza solo, hay que preguntarle."""
+        finished_ports = [port for port, process in self._processes.items() if process.poll() is not None]
+        for port in finished_ports:
+            del self._processes[port]
+            self.release_port(port)

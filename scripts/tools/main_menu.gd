@@ -15,19 +15,28 @@ var _ability_slot_2_option: OptionButton
 
 func _ready() -> void:
 	var connection_error := _consume_connection_error()
-	_build_ui(connection_error)
+	var match_result_message := _consume_match_result_message()
+	_build_ui(connection_error, match_result_message)
 
 
 func _consume_connection_error() -> String:
+	return _consume_meta("connection_error")
+
+
+func _consume_match_result_message() -> String:
+	return _consume_meta("match_result_message")
+
+
+func _consume_meta(key: String) -> String:
 	var root := get_tree().root
-	if root.has_meta("connection_error"):
-		var message: String = root.get_meta("connection_error")
-		root.remove_meta("connection_error")
+	if root.has_meta(key):
+		var message: String = root.get_meta(key)
+		root.remove_meta(key)
 		return message
 	return ""
 
 
-func _build_ui(connection_error: String) -> void:
+func _build_ui(connection_error: String, match_result_message: String) -> void:
 	var ui_layer := CanvasLayer.new()
 	add_child(ui_layer)
 
@@ -105,6 +114,14 @@ func _build_ui(connection_error: String) -> void:
 		error_label.text = connection_error
 		error_label.add_theme_color_override("font_color", Color.RED)
 		vbox.add_child(error_label)
+
+	if match_result_message != "":
+		var result_label := Label.new()
+		result_label.text = match_result_message
+		# Color neutro, no rojo: esto no es un error, la partida terminó
+		# normalmente (ver ClientRoot._on_match_ended).
+		result_label.add_theme_color_override("font_color", Color.YELLOW)
+		vbox.add_child(result_label)
 
 	var client_row := HBoxContainer.new()
 	vbox.add_child(client_row)

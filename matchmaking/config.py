@@ -41,3 +41,9 @@ MATCH_PORT_RANGE_END = int(os.environ.get("MATCH_PORT_RANGE_END", "9099"))
 # todavía (el servidor ya arrancaba a escuchar casi al instante en las
 # pruebas de Fase 6).
 SERVER_STARTUP_DELAY_SECONDS = float(os.environ.get("SERVER_STARTUP_DELAY_SECONDS", "1.5"))
+
+# Cada cuánto se revisa si algún ServerRoot lanzado ya terminó su partida
+# y cerró su proceso solo, para liberar su puerto (ver match_launcher.py,
+# reap_finished_matches). Las partidas duran varios minutos — no hace
+# falta más finura que esto.
+REAP_INTERVAL_SECONDS = float(os.environ.get("REAP_INTERVAL_SECONDS", "10"))
