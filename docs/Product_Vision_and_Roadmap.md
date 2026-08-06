@@ -185,7 +185,7 @@ desde el inicio.
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Hecho (ENet real sobre loopback, N jugadores conectados y renderizados por cliente) |
 | 5 | Multiplayer LAN | ⚠️ Código listo (el servidor ya escucha en todas las interfaces, no solo loopback; muestra su IP de LAN en pantalla) — falta probarlo con una segunda PC física en la misma red |
 | 6 | Servidor dedicado, juego por Internet | ⚠️ Código listo (servidor headless vía `--headless` + escena directa, detección básica de desconexión con vuelta al menú) — falta probarlo con port forwarding real en el router del dueño del proyecto |
-| 7 | Matchmaking, ranking, colas competitivas | Pendiente |
+| 7 | Matchmaking, ranking, colas competitivas | ⚠️ Arrancado (`matchmaking/`, servicio Python fuera de Godot) — solo emparejar hecho y probado en vivo (cola anónima, lanza un `ServerRoot` dinámico por partida, dos clientes reales se conectaron a la misma partida automáticamente). Sin cuentas/login/ranking todavía. Ver `docs/architecture/Implementation_Decisions.md` — de paso encontró un problema real de sincronización entre 2 clientes sostenidos (no relacionado al matchmaking en sí), anotado como tarea aparte |
 | 8 | Bots, IA | Pendiente |
 | 9 | Steam | Pendiente |
 | 10 | Balance, beta cerrada, optimización, lanzamiento | Pendiente |

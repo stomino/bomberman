@@ -20,10 +20,12 @@ var _map_is_custom: bool = false
 var _next_spawn_index: int = 0
 var _status_label: Label
 var _is_headless: bool = false
+var _port: int = DEFAULT_PORT
 
 
 func _ready() -> void:
 	_is_headless = DisplayServer.get_name() == "headless"
+	_port = _parse_port_override()
 	balance = GameBalance.load_from_file()
 	game_map = _create_game_map()
 	bomb_system = BombSystem.new(game_map, balance, not _map_is_custom)
@@ -65,6 +67,22 @@ func _selected_map_path() -> String:
 	return ""
 
 
+func _parse_port_override() -> int:
+	"""Matchmaking (Fase 7, ver docs/architecture/Implementation_Decisions.md)
+	lanza un ServerRoot por partida y necesita que cada uno escuche en un
+	puerto distinto — se lo pasa como `--port=N` después del separador
+	`--`, que Godot no interpreta como argumento propio del motor
+	(OS.get_cmdline_user_args() son solo los que están después de ese
+	separador). Sin ese argumento, sigue usando DEFAULT_PORT — el flujo
+	manual de hosteo (Fase 5/6) no cambia."""
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with("--port="):
+			var value := arg.substr(len("--port=")).to_int()
+			if value > 0:
+				return value
+	return DEFAULT_PORT
+
+
 func _connect_bomb_signals() -> void:
 	bomb_system.block_destroyed.connect(func(pos): GameLogger.debug("Bloque destruido en: " + str(pos), "ServerRoot"))
 	bomb_system.bomb_exploded.connect(func(pos, _cells): GameLogger.debug("Bomba explotó en: " + str(pos), "ServerRoot"))
@@ -78,9 +96,9 @@ func _start_server() -> void:
 	# red de la máquina (no solo loopback) — es lo que ya permite Fase 5
 	# (LAN) sin cambiar el protocolo, ver
 	# docs/architecture/Implementation_Decisions.md.
-	var error := peer.create_server(DEFAULT_PORT, balance.max_players)
+	var error := peer.create_server(_port, balance.max_players)
 	if error != OK:
-		push_error("[ServerRoot] No se pudo iniciar el servidor en el puerto %d (error %d)" % [DEFAULT_PORT, error])
+		push_error("[ServerRoot] No se pudo iniciar el servidor en el puerto %d (error %d)" % [_port, error])
 		return
 
 	multiplayer.multiplayer_peer = peer
@@ -88,7 +106,7 @@ func _start_server() -> void:
 	multiplayer.peer_disconnected.connect(_on_peer_disconnected)
 
 	var lan_ip := _get_lan_ip()
-	GameLogger.info("Servidor escuchando en %s:%d" % [lan_ip, DEFAULT_PORT], "ServerRoot")
+	GameLogger.info("Servidor escuchando en %s:%d" % [lan_ip, _port], "ServerRoot")
 	_update_status_ui()
 
 
@@ -170,7 +188,7 @@ func _update_status_ui() -> void:
 
 	var lan_ip := _get_lan_ip()
 	_status_label.text = "Servidor: %s:%d\nJugadores: %d/%d" % [
-		lan_ip, DEFAULT_PORT, player_system.players.size(), balance.max_players
+		lan_ip, _port, player_system.players.size(), balance.max_players
 	]
 
 
@@ -182,7 +200,7 @@ func _print_status() -> void:
 	debug apagado por default."""
 	var lan_ip := _get_lan_ip()
 	print("[ServerRoot] %s:%d — Jugadores: %d/%d" % [
-		lan_ip, DEFAULT_PORT, player_system.players.size(), balance.max_players
+		lan_ip, _port, player_system.players.size(), balance.max_players
 	])
 
 

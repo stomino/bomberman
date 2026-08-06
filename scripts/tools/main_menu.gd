@@ -85,6 +85,11 @@ func _build_ui(connection_error: String) -> void:
 	sandbox_button.pressed.connect(_on_sandbox_pressed)
 	vbox.add_child(sandbox_button)
 
+	var matchmaking_button := Button.new()
+	matchmaking_button.text = "Buscar partida"
+	matchmaking_button.pressed.connect(_on_matchmaking_pressed)
+	vbox.add_child(matchmaking_button)
+
 	var editor_button := Button.new()
 	editor_button.text = "Editor de Mapas"
 	editor_button.pressed.connect(_on_editor_pressed)
@@ -140,6 +145,11 @@ func _on_sandbox_pressed() -> void:
 
 	_apply_ability_slot_selection()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+
+func _on_matchmaking_pressed() -> void:
+	_apply_ability_slot_selection()
+	get_tree().change_scene_to_file("res://scenes/matchmaking.tscn")
 
 
 func _on_editor_pressed() -> void:

@@ -72,10 +72,11 @@ func _despawn_player_node(id: int) -> void:
 
 func _connect_to_server() -> void:
 	var ip := _selected_server_ip()
+	var port := _selected_server_port()
 	var peer := ENetMultiplayerPeer.new()
-	var error := peer.create_client(ip, ServerRoot.DEFAULT_PORT)
+	var error := peer.create_client(ip, port)
 	if error != OK:
-		push_error("[ClientRoot] No se pudo conectar a %s:%d (error %d)" % [ip, ServerRoot.DEFAULT_PORT, error])
+		push_error("[ClientRoot] No se pudo conectar a %s:%d (error %d)" % [ip, port, error])
 		return
 
 	multiplayer.multiplayer_peer = peer
@@ -88,6 +89,16 @@ func _selected_server_ip() -> String:
 	if get_tree().root.has_meta("server_ip"):
 		return get_tree().root.get_meta("server_ip")
 	return "127.0.0.1"
+
+
+func _selected_server_port() -> int:
+	"""Matchmaking (Fase 7) pasa un puerto dinámico vía meta
+	"server_port" — mismo patrón que "server_ip". Sin esa meta (flujo
+	manual de Fase 5/6, tipear una IP y conectar), sigue usando
+	ServerRoot.DEFAULT_PORT como siempre."""
+	if get_tree().root.has_meta("server_port"):
+		return get_tree().root.get_meta("server_port")
+	return ServerRoot.DEFAULT_PORT
 
 
 func _on_connected_to_server() -> void:

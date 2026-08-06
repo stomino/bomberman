@@ -1212,3 +1212,111 @@ dependencias se armen en la raíz de composición. Inyectar por código desde
 `GameRoot` cumple ambas reglas sin depender de que alguien recuerde
 conectar la referencia en el editor de Godot cada vez que se toque la
 escena.
+
+## Fase 7 (arranque): Matchmaking — solo emparejar
+
+**Decisión:** primera pieza de Fase 7. A diferencia de todo lo hecho hasta
+acá, vive **fuera de Godot** — `matchmaking/` es un servicio Python nuevo
+en la raíz del repo, no una escena más del proyecto. Cuatro decisiones
+confirmadas con el dueño del producto:
+
+1. **Stack: Python.** El rol es 100% I/O-bound (cola, esperar procesos,
+   más adelante DB) — nunca toca la simulación en tiempo real, que sigue
+   enteramente en Godot/ENet. Además es lo que el dueño del proyecto ya
+   conoce, relevante para un proyecto que mantiene solo/a durante años.
+2. **Alcance: solo emparejar.** Sin cuentas, login, ni ranking
+   (Elo/Glicko-2) todavía — cola anónima FIFO, empareja de a 2.
+3. **El matchmaking lanza un `ServerRoot` headless nuevo por partida**
+   encontrada, no apunta a uno ya corriendo a mano.
+4. **Corre en la PC local** del dueño del proyecto por ahora.
+
+**Protocolo cliente↔matchmaking:** WebSocket + JSON (`WebSocketPeer`
+nativo de Godot del lado cliente, librería `websockets` de Python del
+otro). Cliente → servidor: `{"type": "join_queue"}`. Servidor → cliente:
+`{"type": "matched", "server_ip": ..., "server_port": ...}`.
+
+**Por qué cada partida necesita un puerto distinto:**
+`ServerRoot.DEFAULT_PORT` (8910) es una `const` — dos procesos no pueden
+escuchar en el mismo puerto, y el matchmaking puede lanzar varias
+partidas a la vez. `matchmaking/match_launcher.py` reserva un puerto
+libre de un rango configurable (9000-9099 por defecto, separado del 8910
+del flujo manual para no pisarse si se usan los dos a la vez) y se lo
+pasa al proceso Godot después del separador `--`, que Godot no interpreta
+como argumento propio del motor:
+```
+<godot_exe> --headless --path <project> scenes/server.tscn -- --port=9001
+```
+`ServerRoot._parse_port_override()` (nuevo) busca `--port=N` en
+`OS.get_cmdline_user_args()`; sin ese argumento sigue usando
+`DEFAULT_PORT` — el flujo manual de Fase 5/6 (botón "Servidor" del menú)
+no cambia en absoluto. `ClientRoot` gana el mismo patrón del otro lado:
+`_selected_server_port()` (mirror de `_selected_server_ip()`) lee una
+meta `"server_port"` del root del árbol, default `ServerRoot.DEFAULT_PORT`
+si no está seteada.
+
+**`matchmaking/` — estructura, separando lógica pura de infraestructura**
+(mismo criterio que ya sigue todo el proyecto Godot, ver
+`Engine_Architecture_Specification_v1.0.md`, aplicado ahora también del
+lado Python):
+- `queue_manager.py`: cola FIFO pura (`add`/`remove`/`pop_pair`), sin
+  `asyncio` ni sockets — 100% testeable con pytest normal.
+- `match_launcher.py`: `allocate_port`/`release_port` sobre el rango
+  configurado + `launch_match(port)` que arma el comando y hace
+  `subprocess.Popen`. Puertos asignados en memoria (`_used_ports`), no
+  se verifica contra el SO — alcanza para esta pasada de un solo proceso
+  de matchmaking.
+- `protocol.py`: encode/decode JSON + constantes de tipo de mensaje.
+- `server.py`: el único módulo con `asyncio`/`websockets` — conecta las
+  piezas puras de arriba con conexiones reales. Por cada mensaje
+  `join_queue` mete al cliente en la cola; si `pop_pair()` da un par,
+  reserva puerto, lanza el proceso, espera `SERVER_STARTUP_DELAY_SECONDS`
+  (fijo, ~1.5s — no hay handshake real de "servidor listo" todavía, ver
+  más abajo) y les manda `matched` a los dos.
+- `config.py`: todo por variable de entorno. La única sin default
+  razonable es `GODOT_EXECUTABLE` (la ruta al ejecutable varía por
+  máquina) — se documenta en `matchmaking/README.md`.
+
+**`scenes/matchmaking.tscn` + `scripts/tools/matchmaking_client.gd`:**
+mismo patrón de "UI armada por código" que `main_menu.gd`. Se conecta al
+matchmaking (dirección fija `127.0.0.1:8765` esta pasada, coherente con
+"corre en la PC local"), manda `join_queue`, hace poll del `WebSocketPeer`
+en `_process()`, y al recibir `matched` guarda `server_ip`/`server_port`
+en meta del root (mismo mecanismo que `selected_map_path`/`server_ip` ya
+usan) y cambia a `client.tscn` — reutiliza el 100% de `ClientRoot` sin
+tocarlo más que el puerto dinámico ya descripto arriba. `main_menu.gd`
+gana el botón "Buscar partida" (aplica la selección de habilidades igual
+que Sandbox/Cliente antes de cambiar de escena).
+
+**Probado:** 92/92 tests de Godot (esta pasada no toca Domain/Systems,
+cero regresiones esperadas y confirmadas) + 11/11 tests nuevos de pytest
+(`matchmaking/tests/`, cola/empareje y asignación de puertos con
+`subprocess.Popen` mockeado). Verificado en vivo, dos veces, con dos
+clientes Godot reales (procesos separados) y el servicio de matchmaking
+corriendo en esta máquina: ambos se anotaron, matchearon, el backend
+lanzó un `ServerRoot` dinámico (puerto 9000 la primera vez, 9001 la
+segunda — confirma que el rango de puertos y la no-reutilización
+funcionan), y los dos clientes se conectaron a la misma partida
+automáticamente sin ninguna acción manual — capturas de pantalla y logs
+confirmando ambos casos.
+
+**Hallazgo real durante esta verificación, fuera del alcance de esta
+pasada:** en la segunda corrida, dejando la partida corriendo ~30
+segundos reales con chequeos periódicos, uno de los dos clientes
+("B") dejó de ver al otro jugador a partir del segundo ~24 (su propio
+`player_system.players` pasó de 2 a 1 entradas y no se recuperó), pese a
+que el otro cliente ("A") siguió viendo a ambos sin problema todo el
+tiempo y el servidor nunca reportó ninguna desconexión de "A" en ese
+lapso. **No tiene relación con el código de esta pasada** — matchmaking
+no toca `_broadcast_snapshot`/`SnapshotCodec`/ninguna lógica de red
+existente; es un hallazgo sobre la capa de red base (Fase 4-6) que nunca
+se había estresado con una sesión de más de unos pocos segundos entre 2
+clientes reales simultáneos. Decisión explícita del dueño del producto:
+cerrar matchmaking como está documentado acá, investigar esto por
+separado — queda anotado como tarea propia, no bloquea esta entrega.
+
+**Fuera de alcance (explícito):** cuentas/login, ranking (Elo/Glicko-2),
+hosting cloud, cerrar el proceso del `ServerRoot` cuando termina la
+partida (queda corriendo — limitación conocida), handshake real de
+"servidor listo" (espera fija en su lugar), reconexión/espectador (ya
+fuera de alcance desde Fase 6), UI para elegir la dirección del
+matchmaking (fija a `127.0.0.1` esta pasada).
