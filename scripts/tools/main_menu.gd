@@ -9,10 +9,20 @@ var _ip_input: LineEdit
 
 
 func _ready() -> void:
-	_build_ui()
+	var connection_error := _consume_connection_error()
+	_build_ui(connection_error)
 
 
-func _build_ui() -> void:
+func _consume_connection_error() -> String:
+	var root := get_tree().root
+	if root.has_meta("connection_error"):
+		var message: String = root.get_meta("connection_error")
+		root.remove_meta("connection_error")
+		return message
+	return ""
+
+
+func _build_ui(connection_error: String) -> void:
 	var ui_layer := CanvasLayer.new()
 	add_child(ui_layer)
 
@@ -53,9 +63,15 @@ func _build_ui() -> void:
 	vbox.add_child(editor_button)
 
 	var server_button := Button.new()
-	server_button.text = "Servidor (Fase 4: red local)"
+	server_button.text = "Servidor (LAN / Internet con port forwarding)"
 	server_button.pressed.connect(_on_server_pressed)
 	vbox.add_child(server_button)
+
+	if connection_error != "":
+		var error_label := Label.new()
+		error_label.text = connection_error
+		error_label.add_theme_color_override("font_color", Color.RED)
+		vbox.add_child(error_label)
 
 	var client_row := HBoxContainer.new()
 	vbox.add_child(client_row)

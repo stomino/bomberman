@@ -184,7 +184,7 @@ desde el inicio.
 | 3.5 | Editor de mapas | ✅ Hecho (pintar/guardar/cargar/jugar + redimensionar + scroll/zoom). Pendiente real: guardar en `user://` (recién hace falta al exportar) |
 | 4 | Arquitectura Cliente-Servidor local (todo en una sola PC) | ✅ Hecho (ENet real sobre loopback, N jugadores conectados y renderizados por cliente) |
 | 5 | Multiplayer LAN | ⚠️ Código listo (el servidor ya escucha en todas las interfaces, no solo loopback; muestra su IP de LAN en pantalla) — falta probarlo con una segunda PC física en la misma red |
-| 6 | Servidor dedicado, juego por Internet | Pendiente |
+| 6 | Servidor dedicado, juego por Internet | ⚠️ Código listo (servidor headless vía `--headless` + escena directa, detección básica de desconexión con vuelta al menú) — falta probarlo con port forwarding real en el router del dueño del proyecto |
 | 7 | Matchmaking, ranking, colas competitivas | Pendiente |
 | 8 | Bots, IA | Pendiente |
 | 9 | Steam | Pendiente |

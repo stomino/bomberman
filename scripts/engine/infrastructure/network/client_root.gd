@@ -83,6 +83,7 @@ func _connect_to_server() -> void:
 	multiplayer.multiplayer_peer = peer
 	multiplayer.connected_to_server.connect(_on_connected_to_server)
 	multiplayer.connection_failed.connect(_on_connection_failed)
+	multiplayer.server_disconnected.connect(_on_server_disconnected)
 
 
 func _selected_server_ip() -> String:
@@ -97,7 +98,25 @@ func _on_connected_to_server() -> void:
 
 
 func _on_connection_failed() -> void:
-	push_error("[ClientRoot] No se pudo conectar al servidor")
+	_fail_and_return_to_menu("No se pudo conectar al servidor.")
+
+
+func _on_server_disconnected() -> void:
+	_fail_and_return_to_menu("Se perdió la conexión con el servidor.")
+
+
+func _fail_and_return_to_menu(message: String) -> void:
+	"""Fase 6 (ver docs/architecture/Implementation_Decisions.md): detección
+	básica de desconexión, sin reconexión ni resync de estado — el jugador
+	vuelve al menú con un mensaje. close() antes de = null para que un
+	segundo intento de conexión desde el menú arranque con un multiplayer
+	limpio, no con un peer cerrado colgado."""
+	GameLogger.warning(message, "ClientRoot")
+	if multiplayer.multiplayer_peer != null:
+		multiplayer.multiplayer_peer.close()
+		multiplayer.multiplayer_peer = null
+	get_tree().root.set_meta("connection_error", message)
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 # ============================================

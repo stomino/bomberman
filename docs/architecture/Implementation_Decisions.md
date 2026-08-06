@@ -480,6 +480,86 @@ transporte en sí) para no complicar el primer host manual con múltiples
 IPs candidatas — ENet igual podría funcionar sobre IPv6 si se le pasa
 esa dirección a mano.
 
+## Fase 6: Servidor dedicado, juego por Internet
+
+**Decisión:** igual que Fase 5 (LAN) no necesitó tocar el protocolo, Fase 6
+tampoco — `ENetMultiplayerPeer.create_server()` ya escucha en todas las
+interfaces desde Fase 4, así que un servidor alcanzable por Internet es
+exactamente el mismo binario/escena con el puerto (8910) reenviado en el
+router de quien hostea, no un camino de código distinto. Los dos gaps
+reales que sí hacían falta cerrar eran operativos: el servidor no tenía
+forma de reportar su estado sin pantalla, y el cliente no reaccionaba en
+absoluto a una caída de conexión.
+
+**Sin exportar/empaquetar todavía:** decisión explícita del dueño del
+producto para esta pasada. El servidor dedicado corre headless directo
+desde código fuente:
+
+```
+godot --headless --path . scenes/server.tscn
+```
+
+Pasar una escena por línea de comandos hace que Godot la use en vez de
+`run/main_scene` — no hace falta ningún cambio de código para "saltear" el
+menú principal en una máquina sin display. Exportar un binario standalone
+(`export_presets.cfg` + export templates) queda deferred a una futura
+optimización de deploy; no bloqueaba probar que el juego funciona por
+Internet.
+
+**`ServerRoot` headless-friendly:** `_is_headless` (seteado en `_ready()`
+vía `DisplayServer.get_name() == "headless"`) hace que `_build_status_ui()`
+no construya ningún `CanvasLayer`/`Label` bajo un driver de display nulo, y
+que `_update_status_ui()` llame a `_print_status()` en su lugar — mismo
+contenido que ya tenía el Label (`IP:puerto`, jugadores conectados/máximo),
+pero por `print()` plano, no vía `GameLogger` (que está apagado por
+default, ver Fase 5 — para quien realmente está operando un servidor esto
+no es un log de debug opcional, es la única forma de ver que el proceso
+está vivo y respondiendo). Los tres call sites que ya actualizaban el
+status (`_start_server`, `_on_peer_connected`, `_on_peer_disconnected`) no
+cambiaron: el branch headless vive centralizado en
+`_build_status_ui`/`_update_status_ui`, sin duplicar nada.
+
+**`ClientRoot` gana detección básica de desconexión:** hasta ahora
+`_on_connection_failed()` solo hacía `push_error` (invisible para un
+jugador real) y no había ninguna conexión a `multiplayer.server_disconnected`
+— si el servidor caía a mitad de partida, el cliente quedaba congelado con
+el último snapshot, sin ningún aviso. Ahora ambas señales
+(`connection_failed` y `server_disconnected`) rutean a un helper común,
+`_fail_and_return_to_menu(message)`: cierra el peer (`close()` + `= null`,
+para que un segundo intento de conexión arranque limpio), guarda el
+mensaje vía `get_tree().root.set_meta("connection_error", message)` —
+mismo patrón ya usado para `server_ip`/`selected_map_path` — y vuelve a
+`main_menu.tscn`. `main_menu.gd._ready()` lee y limpia ese meta de
+inmediato (para que no reaparezca en una visita al menú no relacionada) y
+lo muestra como un `Label` rojo. Dos mensajes distintos según la causa
+("No se pudo conectar al servidor." vs. "Se perdió la conexión con el
+servidor.") porque le sirve al jugador saber cuál pasó.
+
+**Probado en vivo (real, no solo por ausencia de errores):** servidor
+levantado headless de verdad (`godot --headless --path . scenes/server.tscn`)
+mostrando por stdout `[ServerRoot] IP:puerto — Jugadores: 0/4`; un cliente
+normal (con ventana) conectó y el contador subió a `1/4` en un nuevo print.
+Matar el proceso del servidor abruptamente (sin shutdown prolijo) hizo que
+el cliente, tras el timeout de ENet, detectara `server_disconnected` y
+volviera al menú mostrando "Se perdió la conexión con el servidor." —
+confirmado con una captura de pantalla real del cliente en ese estado.
+Se probó también el camino de falla al conectar (cliente apuntando a un
+puerto sin nada escuchando): mismo comportamiento, mensaje "No se pudo
+conectar al servidor.", confirmado con otra captura real. Ninguna
+regresión en la suite de tests (76/76).
+
+Nota honesta, igual que Fase 5: esto **no reemplaza una prueba real por
+Internet** con el port forwarding del router del dueño del proyecto y una
+segunda PC en otra red — eso queda pendiente de que él lo pruebe (no
+tengo forma de manejar dos redes distintas).
+
+**Fuera de alcance:** abrir/reenviar el puerto 8910 en el router es
+configuración del usuario, no algo que se automatice desde el código —
+mismo criterio que el Firewall de Windows en Fase 5. Reconexión a una
+partida en curso, modo espectador, y cualquier diseño de resincronización
+de estado quedan explícitamente afuera: una desconexión hoy siempre
+termina la partida para ese cliente, sin excepción.
+
 ## Fase 4: marcador "VOS" para distinguir al jugador propio
 
 **Decisión:** `scenes/player.tscn` gana un hijo `Label` ("LocalIndicator",

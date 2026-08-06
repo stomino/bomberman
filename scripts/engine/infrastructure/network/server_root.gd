@@ -19,9 +19,11 @@ var game_manager: GameManager
 var _map_is_custom: bool = false
 var _next_spawn_index: int = 0
 var _status_label: Label
+var _is_headless: bool = false
 
 
 func _ready() -> void:
+	_is_headless = DisplayServer.get_name() == "headless"
 	balance = GameBalance.load_from_file()
 	game_map = _create_game_map()
 	bomb_system = BombSystem.new(game_map, balance, not _map_is_custom)
@@ -144,6 +146,9 @@ func _build_status_ui() -> void:
 	'no dibuja nada'). Para Fase 5 (LAN) hace falta que quien hostea pueda
 	leer la IP:puerto sin ir a buscar la consola — un Label mínimo alcanza,
 	no amerita más que eso."""
+	if _is_headless:
+		return
+
 	var ui_layer := CanvasLayer.new()
 	add_child(ui_layer)
 
@@ -156,6 +161,10 @@ func _build_status_ui() -> void:
 
 
 func _update_status_ui() -> void:
+	if _is_headless:
+		_print_status()
+		return
+
 	if not _status_label:
 		return
 
@@ -163,6 +172,18 @@ func _update_status_ui() -> void:
 	_status_label.text = "Servidor: %s:%d\nJugadores: %d/%d" % [
 		lan_ip, DEFAULT_PORT, player_system.players.size(), balance.max_players
 	]
+
+
+func _print_status() -> void:
+	"""Servidor headless (Fase 6, ver docs/architecture/Implementation_Decisions.md):
+	sin pantalla no hay Label posible, así que esta es la única forma de que
+	quien opera el servidor vea su estado. Print plano, no GameLogger — la
+	visibilidad operativa de un servidor real no debe depender de un flag de
+	debug apagado por default."""
+	var lan_ip := _get_lan_ip()
+	print("[ServerRoot] %s:%d — Jugadores: %d/%d" % [
+		lan_ip, DEFAULT_PORT, player_system.players.size(), balance.max_players
+	])
 
 
 func _broadcast_snapshot() -> void:
