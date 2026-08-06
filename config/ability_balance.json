@@ -9,7 +9,7 @@
         "range": 3
     },
     "flash": {
-        "range": 4,
+        "range": 2,
         "cooldown_ticks": 300
     }
 }

@@ -18,7 +18,7 @@ var speed_boost_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 var dash_unlock_ticks: int = 1800  # 30s a 60 ticks/seg
 var dash_range: int = 3  # celdas que cubre el dash (1 = un paso normal)
 
-var flash_range: int = 4  # celdas que cubre el flash, sin validar el camino intermedio
+var flash_range: int = 2  # celdas que cubre el flash, sin validar el camino intermedio
 var flash_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
 
 
