@@ -560,6 +560,48 @@ partida en curso, modo espectador, y cualquier diseño de resincronización
 de estado quedan explícitamente afuera: una desconexión hoy siempre
 termina la partida para ese cliente, sin excepción.
 
+## Fix: el cliente de red solo avanzaba una celda por tecla apretada
+
+**El problema real, encontrado probando en vivo la Fase 6:** al jugar por
+red (LAN o Internet) y mantener apretada una tecla de movimiento, el
+personaje avanzaba exactamente una celda y se frenaba, aunque la tecla
+siguiera apretada — en el Sandbox local esto nunca pasaba.
+
+**Causa:** `PlayerSystem.set_move_direction()` no reinicia el movimiento
+si lo llaman con la misma dirección mientras el jugador ya se está
+moviendo hacia ahí — para seguir cruzando celdas hace falta que quien
+llama insista en cada tick, así al completarse una celda (`is_moving`
+vuelve a `false`) la siguiente llamada lo reinicie
+(`PlayerSystem._try_start_move`). `player_node.gd` ya hace exactamente
+eso: llama a `set_player_move_direction()` en cada `_physics_process`
+mientras la tecla está apretada, sin excepción. Pero
+`ClientRoot.set_player_move_direction()` tenía una deduplicación
+(`_last_sent_direction`/`_has_sent_direction`) que evitaba reenviar el
+RPC si la dirección no había cambiado — pensada como optimización de
+ancho de banda en Fase 4, nunca se probó sosteniendo una tecla contra un
+servidor real hasta ahora. Efecto: el servidor recibía una sola orden de
+movimiento, movía al jugador una celda, y como nunca llegaba una segunda
+orden, `next_direction` quedaba en cero y el movimiento se frenaba ahí —
+exactamente lo que documenta `Implementation_Decisions.md` (Fase 4,
+Commands) sobre por qué el sandbox local pasa por el mismo pipeline que
+la red: sirve como test fiel de cómo se comporta el juego en red, y acá
+justamente divergían.
+
+**Decisión:** se sacó la deduplicación. `ClientRoot.set_player_move_direction()`
+manda el RPC en cada frame que lo llaman, igual que `GameRoot` hace
+localmente — sin ninguna condición. El canal ya es `unreliable_ordered`
+(paquete chico), así que mandar más seguido no es un problema de ancho de
+banda real a la escala de este juego (1v1/FFA de pocos jugadores).
+
+**Probado:** suite completa (77/77, incluye un test nuevo,
+`test_player_keeps_moving_across_multiple_cells_when_direction_resent_every_tick`
+en `tests/unit/test_player_system.gd`, que reproduce exactamente el
+contrato que rompía este bug — reenviar la misma dirección tick a tick
+debe cruzar más de una celda, no frenarse después de la primera).
+También verificado con servidor headless + cliente reales que la suite
+de tests de Fase 6 (conexión, desconexión, contador de jugadores) sigue
+funcionando sin regresión tras el cambio.
+
 ## Fase 4: marcador "VOS" para distinguir al jugador propio
 
 **Decisión:** `scenes/player.tscn` gana un hijo `Label` ("LocalIndicator",

@@ -13,8 +13,6 @@ extends GameRoot
 
 const PLAYER_SCENE := preload("res://scenes/player.tscn")
 
-var _last_sent_direction: Vector2i = Vector2i.ZERO
-var _has_sent_direction: bool = false
 var _player_nodes: Dictionary = {}  # player_id -> Node, ver _sync_player_nodes()
 
 
@@ -125,10 +123,14 @@ func _fail_and_return_to_menu(message: String) -> void:
 # ============================================
 
 func set_player_move_direction(direction: Vector2i) -> void:
-	if _has_sent_direction and direction == _last_sent_direction:
-		return
-	_last_sent_direction = direction
-	_has_sent_direction = true
+	"""Se manda en cada frame que la tecla sigue apretada (sin deduplicar
+	por dirección), igual que GameRoot hace localmente — PlayerSystem
+	necesita recibir la dirección de nuevo cada vez que el jugador termina
+	de cruzar una celda para seguir moviéndose (ver
+	docs/architecture/Implementation_Decisions.md, Fase 6). Una versión
+	anterior deduplicaba por ancho de banda, pero eso hacía que el jugador
+	solo avanzara una celda por tecla apretada en red — rompía la paridad
+	sandbox/red que el pipeline de Commands busca garantizar."""
 	submit_move.rpc_id(1, direction)
 
 

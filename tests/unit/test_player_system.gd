@@ -53,6 +53,33 @@ func test_player_moves_one_cell_after_ticks_for_speed() -> void:
 	assert_eq(player.grid_position, Vector2i(3, 2), "debería cruzar a la celda siguiente en el décimo tick")
 
 
+func test_player_keeps_moving_across_multiple_cells_when_direction_resent_every_tick() -> void:
+	"""Simula lo que hace la Presentation local (player_node.gd) y, desde
+	el fix de Fase 6, también ClientRoot: reenviar la misma dirección en
+	cada tick mientras la tecla sigue apretada. Cubre una regresión real
+	encontrada en client_root.gd, que deduplicaba el envío del RPC y
+	dejaba al jugador frenado después de cruzar una sola celda aunque
+	siguiera con la tecla apretada — set_move_direction no vuelve a
+	arrancar el movimiento si ya está en curso hacia la misma dirección
+	(ver PlayerSystem.set_move_direction), así que hace falta que quien
+	llama insista tick a tick, no una sola vez."""
+	var balance := _make_balance()
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	# tick_rate=60, speed=6.0 -> 10 ticks exactos por celda; 20 ticks
+	# alcanzan para cruzar exactamente 2 celdas si el movimiento continúa.
+	for i in range(20):
+		system.set_move_direction(0, Vector2i.RIGHT)
+		system.tick(state)
+
+	assert_eq(player.grid_position, Vector2i(4, 2), "debería haber cruzado 2 celdas, no frenarse después de la primera")
+
+
 func test_player_cannot_move_into_wall() -> void:
 	var balance := _make_balance()
 	var map := GameMap.from_balance(balance)
