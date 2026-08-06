@@ -42,3 +42,10 @@ var has_pending_move: bool = false
 # los jugadores.
 var dash_unlocked: bool = false
 var ability_unlock_progress_ticks: int = 0
+
+# Velocidad ya no es un bonus siempre activo — se activa con un input
+# (ver PlayerSystem.try_activate_speed_boost) por una duración limitada,
+# con cooldown antes de poder reactivarla. Mismo patrón de contador que
+# shield_ticks_remaining.
+var speed_boost_ticks_remaining: int = 0
+var speed_boost_cooldown_ticks_remaining: int = 0

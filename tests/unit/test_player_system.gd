@@ -23,7 +23,6 @@ func _make_balance() -> GameBalance:
 	balance.explosion_duration_base_ticks = 2
 	balance.explosion_duration_min_ticks = 1
 	balance.explosion_duration_max_ticks = 10
-	balance.abilities.speed_ability_bonus = 0.0  # tests de movimiento no deberían depender del default de AbilityBalance
 	return balance
 
 
@@ -324,7 +323,7 @@ func test_ability_unlock_progress_marks_dash_unlocked_at_configured_tick() -> vo
 	assert_true(player.dash_unlocked, "debería desbloquearse exactamente al llegar a dash_unlock_ticks")
 
 
-func test_get_effective_speed_includes_ability_bonus() -> void:
+func test_effective_speed_unaffected_by_ability_bonus_until_activated() -> void:
 	var balance := _make_balance()
 	balance.abilities.speed_ability_bonus = 0.5
 	var map := GameMap.from_balance(balance)
@@ -333,4 +332,60 @@ func test_get_effective_speed_includes_ability_bonus() -> void:
 	var player := _make_player(0, Vector2i(2, 2), balance)
 	system.add_player(player)
 
-	assert_eq(system.get_effective_speed(player), 9.0, "6.0 base * (1 + 0.5 de la habilidad) = 9.0")
+	assert_eq(system.get_effective_speed(player), 6.0, "sin activar la ráfaga, la velocidad es solo la base")
+
+
+func test_speed_boost_applies_bonus_while_active_and_expires() -> void:
+	var balance := _make_balance()
+	balance.abilities.speed_ability_bonus = 0.5
+	balance.abilities.speed_boost_duration_ticks = 2
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	assert_true(system.try_activate_speed_boost(0))
+	assert_eq(system.get_effective_speed(player), 9.0, "6.0 base * (1 + 0.5 de la habilidad) = 9.0 mientras está activa")
+
+	system.tick(state)
+	system.tick(state)
+
+	assert_eq(system.get_effective_speed(player), 6.0, "debería haber vuelto a la base tras speed_boost_duration_ticks")
+
+
+func test_speed_boost_cannot_reactivate_during_cooldown() -> void:
+	var balance := _make_balance()
+	balance.abilities.speed_boost_duration_ticks = 1
+	balance.abilities.speed_boost_cooldown_ticks = 5
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	assert_true(system.try_activate_speed_boost(0))
+	system.tick(state)  # termina la duración, el cooldown sigue corriendo
+
+	assert_false(system.try_activate_speed_boost(0), "no debería poder reactivarse durante el cooldown")
+
+
+func test_speed_boost_can_reactivate_after_cooldown_expires() -> void:
+	var balance := _make_balance()
+	balance.abilities.speed_boost_duration_ticks = 1
+	balance.abilities.speed_boost_cooldown_ticks = 3
+	var map := GameMap.from_balance(balance)
+	var bombs := BombSystem.new(map, balance)
+	var system := PlayerSystem.new(map, balance, bombs)
+	var player := _make_player(0, Vector2i(2, 2), balance)
+	system.add_player(player)
+	var state := GameState.new()
+
+	assert_true(system.try_activate_speed_boost(0))
+
+	for i in range(3):
+		system.tick(state)
+
+	assert_true(system.try_activate_speed_boost(0), "debería poder reactivarse una vez que el cooldown terminó")

@@ -149,6 +149,10 @@ func try_dash() -> void:
 	game_manager.queue_command(DashCommand.new(LOCAL_PLAYER_ID))
 
 
+func try_speed_boost() -> void:
+	game_manager.queue_command(SpeedBoostCommand.new(LOCAL_PLAYER_ID))
+
+
 func is_player_alive(player_id: int) -> bool:
 	var player := player_system.get_player(player_id)
 	return player != null and player.alive

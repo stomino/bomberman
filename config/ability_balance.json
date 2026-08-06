@@ -1,6 +1,8 @@
 {
     "speed": {
-        "bonus": 0.2
+        "bonus": 0.2,
+        "boost_duration_ticks": 180,
+        "boost_cooldown_ticks": 300
     },
     "dash": {
         "unlock_ticks": 1800

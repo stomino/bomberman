@@ -91,6 +91,8 @@ func _input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("place_bomb"):
 		game_root.try_place_bomb()
+	elif event.is_action_pressed("speed_boost"):
+		game_root.try_speed_boost()
 	elif event.is_action_pressed("dash"):
 		game_root.try_dash()
 

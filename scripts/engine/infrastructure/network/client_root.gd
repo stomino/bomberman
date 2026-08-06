@@ -125,6 +125,10 @@ func try_dash() -> void:
 	submit_dash.rpc_id(1)
 
 
+func try_speed_boost() -> void:
+	submit_speed_boost.rpc_id(1)
+
+
 # ============================================
 # RPC: recibido de verdad acá — aplica el estado autoritativo del servidor
 # sobre los mismos contenedores que los getters heredados de GameRoot ya
@@ -158,4 +162,9 @@ func submit_place_bomb() -> void:
 
 @rpc("any_peer", "call_remote", "reliable")
 func submit_dash() -> void:
+	pass
+
+
+@rpc("any_peer", "call_remote", "reliable")
+func submit_speed_boost() -> void:
 	pass

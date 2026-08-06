@@ -627,22 +627,42 @@ red headless que dependan de este cálculo.
 
 **Decisión:** del backlog "Ideas futuras" (loadout de 2 habilidades por
 jugador), se implementó una primera pasada acotada a propósito
-(acordada con el dueño del producto): solo **Velocidad** (pasiva,
-disponible de entrada) + **Dash** (activa, se desbloquea a los 30s de
-partida), **loadout fijo para todos los jugadores** — sin pantalla de
-selección todavía. Empujar bombas y Flash quedan para después: son
-mecánicas más grandes, con decisiones de diseño propias sin resolver
-(Empujar bombas rompe la regla de "nunca pisar una bomba"; Flash es una
-primitiva de movimiento nueva, no una extensión de la actual).
+(acordada con el dueño del producto): **Velocidad** (activa, disponible
+de entrada — tecla **Q**) + **Dash** (activa, se desbloquea a los 30s de
+partida — tecla **E**), **loadout fijo para todos los jugadores** — sin
+pantalla de selección todavía. Empujar bombas y Flash quedan para
+después: son mecánicas más grandes, con decisiones de diseño propias sin
+resolver (Empujar bombas rompe la regla de "nunca pisar una bomba";
+Flash es una primitiva de movimiento nueva, no una extensión de la
+actual).
 
-`AbilityBalance` (`scripts/engine/core/ability_balance.gd` +
-`config/ability_balance.json`) sigue el mismo patrón que `PowerUpBalance`:
-config propia, compuesta en `GameBalance.abilities`. `speed_ability_bonus`
-se suma directo al cálculo de `PlayerSystem.get_effective_speed()` — en
-esta pasada aplica igual para **todos** los jugadores, porque `Player`
-todavía no tiene un flag de "qué habilidades tiene equipadas" (el
-loadout fijo hardcodeado hace que sea indistinguible de un buff base por
-ahora). El día que exista selección real de loadout, "quién tiene esta
+**Revisión sobre la versión inicial:** Velocidad arrancó como un bonus
+*pasivo* siempre activo. El dueño del producto pidió que las dos
+habilidades se disparen con una tecla (Q la primera, E la segunda) — una
+vez que Velocidad tiene un momento de activación, dejó de tener sentido
+que fuera un buff permanente, así que pasó a ser una **ráfaga temporal
+con cooldown** (`PlayerSystem.try_activate_speed_boost`): mientras
+`Player.speed_boost_ticks_remaining > 0` el bonus de
+`AbilityBalance.speed_ability_bonus` aplica en `get_effective_speed()`
+(antes aplicaba incondicionalmente); `Player.speed_boost_cooldown_ticks_remaining`
+bloquea reactivarla hasta que se agota. Mismo patrón de contador que
+`shield_ticks_remaining`/`ability_unlock_progress_ticks`, ambos se
+resetean en `reset_for_new_round()`. `AbilityBalance` suma
+`speed_boost_duration_ticks` (180 = 3s) y `speed_boost_cooldown_ticks`
+(300 = 5s).
+
+`SpeedBoostCommand` es un espejo exacto de `DashCommand` (mismo patrón
+en `GameManager`/`GameRoot`/`ClientRoot`/`ServerRoot`). A diferencia de
+Dash, `try_activate_speed_boost` no depende de `is_moving` (es un buff,
+no un desplazamiento) ni de ningún flag de desbloqueo — sigue
+"disponible de entrada", solo sujeta a su propio cooldown.
+
+`speed_ability_bonus` en esta pasada aplica igual para **todos** los
+jugadores mientras la ráfaga esté activa, porque `Player` todavía no
+tiene un flag de "qué habilidades tiene equipadas" (el loadout fijo
+hardcodeado hace que sea indistinguible de una habilidad de verdad por
+ahora — la diferencia real aparece en CUÁNDO se activa, no en quién la
+tiene). El día que exista selección real de loadout, "quién tiene esta
 habilidad" pasa a ser un dato de `Player`, no un cambio de fórmula — la
 canalización ya está armada para eso.
 
@@ -674,31 +694,30 @@ desplazamiento proporcionalmente más lento.
 (`GameManager._apply_pending_commands`/`_apply_dash`); el wiring de red
 (`GameRoot.try_dash`/`ClientRoot.try_dash`+`submit_dash`/
 `ServerRoot.submit_dash`) es un espejo exacto de cómo ya viaja
-`PlaceBombCommand`. Nueva acción de input `dash` en `project.godot`,
-tecla Shift (WASD ocupado para mover, Espacio para bomba).
+`PlaceBombCommand`. Acciones de input en `project.godot`: `speed_boost`
+en **Q** (habilidad 1), `dash` en **E** (habilidad 2) — originalmente
+Dash estaba en Shift, se movió a E cuando se agregó la activación de
+Velocidad para que las dos habilidades convivan en teclas consistentes
+(Q/E), dejando Shift libre.
 
-**Efecto colateral real, no un bug:** como el bonus de Velocidad aplica
-incondicionalmente a todos los jugadores, cambió la velocidad base
-efectiva de TODO el juego (antes 6.0 celdas/seg, ahora 7.2 con el
-default de `AbilityBalance`). Un test existente
-(`test_player_moves_one_cell_after_ticks_for_speed`) asumía la cantidad
-exacta de ticks para cruzar una celda con la velocidad vieja — se
-corrigió agregando `balance.abilities.speed_ability_bonus = 0.0` al
-helper `_make_balance()` de `test_player_system.gd`, para que los tests
-de movimiento/colisión no queden acoplados al default de
-`AbilityBalance` (que no es lo que están probando). Los tests que sí
-prueban habilidades fijan el valor que necesitan explícitamente.
+Como el bonus de Velocidad ya no es incondicional (depende de
+`speed_boost_ticks_remaining > 0`), un test existente
+(`test_player_moves_one_cell_after_ticks_for_speed`) que en la versión
+pasiva había necesitado neutralizar el bonus a mano
+(`balance.abilities.speed_ability_bonus = 0.0` en el helper
+`_make_balance()`) ya no lo necesita — sin activar la ráfaga, el bonus
+simplemente no aplica. Se sacó esa línea del helper.
 
-**Probado:** suite completa (72/72, incluye 9 tests nuevos: colisión del
-dash en celda intermedia y destino, dash antes de desbloquear, dash
-exitoso cubre 2 celdas, desbloqueo en el tick exacto, bonus de velocidad
-en el cálculo). Verificación visual real en Sandbox: forzar
-`dash_unlocked` sin esperar los 30s reales, activar el dash, confirmar
-por `grid_position` y captura de pantalla que se movió exactamente 2
-celdas — la primera corrida de la prueba falló por revisar el resultado
-demasiado pronto (el dash tarda 8 ticks reales en completarse a la
-velocidad efectiva actual), no por un bug real; quedó confirmado
-alargando la ventana de espera del script de verificación.
+**Probado:** suite completa (75/75, incluye los 9 tests de Dash más 4
+nuevos de la ráfaga de Velocidad: aplica el bonus mientras dura y expira
+sola, no se puede reactivar durante el cooldown, sí se puede después de
+que el cooldown termina). Verificación visual real en Sandbox usando
+`state.tick` como reloj (no conteo de frames de `_process`, que corren a
+un ritmo distinto del tick rate de la simulación — lección aprendida
+verificando Dash): activar con `try_speed_boost()`, confirmar que
+`get_effective_speed()` sube durante la duración configurada y vuelve a
+la base exactamente después, y que reactivarla durante el cooldown
+efectivamente falla.
 
 **Fuera de esta pasada:** Empujar bombas, Flash, pantalla de selección
 de loadout, objetivos de desbloqueo por ubicación/estructura (solo

@@ -10,7 +10,10 @@ extends RefCounted
 
 const DEFAULT_CONFIG_PATH := "res://config/ability_balance.json"
 
-var speed_ability_bonus: float = 0.2
+var speed_ability_bonus: float = 0.2       # cuánto suma mientras la ráfaga está activa
+var speed_boost_duration_ticks: int = 180  # 3s a 60 ticks/seg
+var speed_boost_cooldown_ticks: int = 300  # 5s a 60 ticks/seg
+
 var dash_unlock_ticks: int = 1800  # 30s a 60 ticks/seg
 
 
@@ -48,6 +51,8 @@ func _apply_config(data: Dictionary) -> void:
 	if data.has("speed"):
 		var s = data["speed"]
 		if s.has("bonus"): speed_ability_bonus = s["bonus"]
+		if s.has("boost_duration_ticks"): speed_boost_duration_ticks = s["boost_duration_ticks"]
+		if s.has("boost_cooldown_ticks"): speed_boost_cooldown_ticks = s["boost_cooldown_ticks"]
 
 	if data.has("dash"):
 		var d = data["dash"]

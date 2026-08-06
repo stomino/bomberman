@@ -31,11 +31,19 @@ func tick(_state: GameState) -> void:
 		_update_player(player)
 		_tick_shield(player)
 		_tick_ability_unlock(player)
+		_tick_speed_boost(player)
 
 
 func _tick_shield(player: Player) -> void:
 	if player.shield_ticks_remaining > 0:
 		player.shield_ticks_remaining -= 1
+
+
+func _tick_speed_boost(player: Player) -> void:
+	if player.speed_boost_ticks_remaining > 0:
+		player.speed_boost_ticks_remaining -= 1
+	if player.speed_boost_cooldown_ticks_remaining > 0:
+		player.speed_boost_cooldown_ticks_remaining -= 1
 
 
 func _tick_ability_unlock(player: Player) -> void:
@@ -148,6 +156,23 @@ func try_dash(player_id: int) -> bool:
 	return true
 
 
+func try_activate_speed_boost(player_id: int) -> bool:
+	"""Habilidad Velocidad: ráfaga temporal, disponible desde el arranque
+	(a diferencia de Dash, no necesita desbloquearse) pero sujeta a
+	cooldown. No depende de is_moving — es un buff, no un desplazamiento."""
+	var player := get_player(player_id)
+
+	if player == null or not player.alive:
+		return false
+
+	if player.speed_boost_cooldown_ticks_remaining > 0:
+		return false
+
+	player.speed_boost_ticks_remaining = balance.abilities.speed_boost_duration_ticks
+	player.speed_boost_cooldown_ticks_remaining = balance.abilities.speed_boost_cooldown_ticks
+	return true
+
+
 func reset_to_position(player_id: int, grid_position: Vector2i) -> void:
 	var player := get_player(player_id)
 
@@ -181,14 +206,18 @@ func reset_for_new_round(player_id: int, spawn_position: Vector2i) -> void:
 	player.shield_ticks_remaining = 0
 	player.dash_unlocked = false
 	player.ability_unlock_progress_ticks = 0
+	player.speed_boost_ticks_remaining = 0
+	player.speed_boost_cooldown_ticks_remaining = 0
 
 
 func get_effective_speed(player: Player) -> float:
-	# Loadout fijo por ahora (ver AbilityBalance): el bonus de la habilidad
-	# Velocidad aplica igual para todos los jugadores, no está gateado por
-	# ningún flag en Player todavía — eso llega con la selección real de
-	# loadout.
-	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack + balance.abilities.speed_ability_bonus
+	# Loadout fijo por ahora (ver AbilityBalance): la ráfaga de Velocidad
+	# está disponible para todos los jugadores, no está gateada por ningún
+	# flag de "quién la tiene equipada" — eso llega con la selección real
+	# de loadout. El bonus solo aplica mientras está activa (ver
+	# try_activate_speed_boost), no es un buff permanente.
+	var ability_bonus := balance.abilities.speed_ability_bonus if player.speed_boost_ticks_remaining > 0 else 0.0
+	var bonus := player.speed_powerup_stacks * balance.powerups.speed_bonus_per_stack + ability_bonus
 	return balance.get_speed_for_character() * (1.0 + bonus)
 
 
