@@ -1314,6 +1314,21 @@ clientes reales simultáneos. Decisión explícita del dueño del producto:
 cerrar matchmaking como está documentado acá, investigar esto por
 separado — queda anotado como tarea propia, no bloquea esta entrega.
 
+**Seguimiento — descartado como bug real:** se reprodujo el mismo
+escenario (servidor headless + 2 clientes reales) pero por el flujo
+**normal** (`godot --path . scenes/client.tscn`, sin el script temporal
+`-s script.gd` extendiendo `SceneTree` que se usó en la verificación de
+matchmaking), con instrumentación temporal (`print` cada 60 ticks del
+lado servidor y de cada cliente, revertida después de confirmar) dejando
+la partida corriendo **~4.7 minutos reales** — casi 10 veces más que el
+punto donde había aparecido el problema. Los tres logs (servidor,
+cliente A, cliente B) mantuvieron `players=2` de forma perfectamente
+consistente todo el tiempo, sin un solo drop. Conclusión: no es un bug
+de la capa de red — fue un artefacto del método de verificación anterior
+(instanciar `ClientRoot` a mano dentro de un `SceneTree` custom vía
+`-s`, en vez de la carga normal de escena), no algo que un jugador real
+vaya a experimentar. No hace falta ninguna corrección de código.
+
 **Fuera de alcance (explícito):** cuentas/login, ranking (Elo/Glicko-2),
 hosting cloud, cerrar el proceso del `ServerRoot` cuando termina la
 partida (queda corriendo — limitación conocida), handshake real de
